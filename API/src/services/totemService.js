@@ -333,38 +333,92 @@ class TotemService {
   }
 
   async getSectoresNoMapeados() {
-    // Obtener sectores del TOTEM que no tienen mapeo
-    const totemData = await prisma.totemData.findMany({
-      take: 100,
-      orderBy: { timestamp: 'desc' }
-    });
+    try {
+      // Versión optimizada: usar agregación en lugar de cargar todos los registros
+      const result = await prisma.$queryRaw`
+        SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(data, '$[*].SECTOR')) as sector
+        FROM totem_data 
+        WHERE JSON_EXTRACT(data, '$[*].SECTOR') IS NOT NULL
+        LIMIT 1000
+      `;
 
-    const sectores = new Set();
-    totemData.forEach(record => {
-      if (Array.isArray(record.data)) {
-        record.data.forEach(row => {
-          if (row.SECTOR) {
-            sectores.add(row.SECTOR.toString());
+      const sectores = new Set();
+      
+      if (result && result.length > 0) {
+        result.forEach(row => {
+          if (row.sector) {
+            // El resultado puede venir como string separado por comas
+            const sectorValues = row.sector.split(',').map(s => s.trim().replace(/"/g, ''));
+            sectorValues.forEach(sector => {
+              if (sector && sector !== 'null') {
+                sectores.add(sector.toString());
+              }
+            });
           }
         });
       }
-    });
 
-    const sectorArray = Array.from(sectores);
-    const mapeados = await prisma.sectorFacultad.findMany({
-      where: { sector: { in: sectorArray } }
-    });
+      // Si la consulta optimizada no funciona, usar método alternativo
+      if (sectores.size === 0) {
+        console.log('Usando método alternativo para obtener sectores...');
+        
+        // Obtener una muestra más pequeña sin ordenar
+        const totemData = await prisma.totemData.findMany({
+          take: 50, // Reducir significativamente la cantidad
+          select: {
+            data: true
+          }
+        });
 
-    const sectoresMapeados = new Set(mapeados.map(m => m.sector));
-    
-    return sectorArray.filter(sector => !sectoresMapeados.has(sector));
+        totemData.forEach(record => {
+          if (Array.isArray(record.data)) {
+            record.data.forEach(row => {
+              if (row.SECTOR) {
+                sectores.add(row.SECTOR.toString());
+              }
+            });
+          }
+        });
+      }
+
+      const sectorArray = Array.from(sectores);
+      
+      if (sectorArray.length === 0) {
+        return [];
+      }
+
+      const mapeados = await prisma.sectorFacultad.findMany({
+        where: { sector: { in: sectorArray } }
+      });
+
+      const sectoresMapeados = new Set(mapeados.map(m => m.sector));
+      
+      return sectorArray.filter(sector => !sectoresMapeados.has(sector));
+    } catch (error) {
+      console.error('Error en getSectoresNoMapeados:', error);
+      // Retornar array vacío en caso de error
+      return [];
+    }
   }
 
   async getCarrerasTotemNoMapeadas() {
-    return await prisma.carreraTotem.findMany({
-      where: { esMapeada: false },
-      orderBy: { codigoTotem: 'asc' }
-    });
+    try {
+      return await prisma.carreraTotem.findMany({
+        where: { esMapeada: false },
+        take: 100, // Limitar la cantidad de resultados
+        select: {
+          id: true,
+          codigoTotem: true,
+          nombreTotem: true,
+          esMapeada: true,
+          carreraId: true
+        }
+        // Removemos el orderBy para evitar problemas de memoria
+      });
+    } catch (error) {
+      console.error('Error en getCarrerasTotemNoMapeadas:', error);
+      return [];
+    }
   }
 
   async getEstadisticasTotem() {
