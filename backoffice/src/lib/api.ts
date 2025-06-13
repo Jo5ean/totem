@@ -100,6 +100,11 @@ export const totemApi = {
     apiClient.post('/totem/mapeos/carreras', data),
   actualizarMapeoCarrera: (codigoTotem: string, data: any) => 
     apiClient.put(`/totem/mapeos/carreras?codigoTotem=${codigoTotem}`, data),
+  
+  // Configuración Visual
+  getConfiguracionVisual: () => apiClient.get('/configuracion/visual'),
+  actualizarConfiguracionVisual: (data: ConfiguracionVisual) => 
+    apiClient.put('/configuracion/visual', data),
 };
 
 // Tipos de datos
@@ -158,4 +163,14 @@ export interface EstadisticasTotem {
     nombreTotem: string;
     esMapeada: boolean;
   }>;
+}
+
+export interface ConfiguracionVisual {
+  id?: number;
+  backgroundImage?: string;
+  titulo?: string;
+  subtitulo?: string;
+  colorPrimario?: string;
+  colorSecundario?: string;
+  activa?: boolean;
 }    

@@ -203,3 +203,17 @@ model AulaConfiguracion {
 
   @@map("aulas_configuracion")
 }
+
+model ConfiguracionVisual {
+  id              Int      @id @default(autoincrement())
+  backgroundImage String?  @map("background_image") @db.VarChar(500)
+  titulo          String?  @db.VarChar(255)
+  subtitulo       String?  @db.VarChar(255)
+  colorPrimario   String?  @map("color_primario") @db.VarChar(7)
+  colorSecundario String?  @map("color_secundario") @db.VarChar(7)
+  activa          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("configuracion_visual")
+}

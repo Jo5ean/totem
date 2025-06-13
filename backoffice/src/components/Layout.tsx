@@ -22,6 +22,7 @@ const navigation = [
   { name: 'Mapeos Carreras', href: '/mapeos-carreras', icon: DocumentTextIcon },
   { name: 'Estadísticas', href: '/estadisticas', icon: ChartBarIcon },
   { name: 'Datos TOTEM', href: '/datos-totem', icon: DocumentTextIcon },
+  { name: 'Config. Visual', href: '/configuracion-visual', icon: Cog6ToothIcon },
   { name: 'Configuración', href: '/configuracion', icon: Cog6ToothIcon },
 ];
 

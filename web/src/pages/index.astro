@@ -1,0 +1,256 @@
+---
+// Obtener configuración dinámica de la API
+const API_BASE_URL = 'http://localhost:3000/api/v1';
+
+let configuracion = {
+	backgroundImage: '/default-bg.jpg',
+	titulo: 'Consultá donde rendís tu examen',
+	subtitulo: 'UCASAL - Educación Digital'
+};
+
+try {
+	// Intentar obtener configuración desde el backoffice/API
+	const response = await fetch(`${API_BASE_URL}/configuracion/visual`);
+	if (response.ok) {
+		const data = await response.json();
+		configuracion = { ...configuracion, ...data };
+	}
+} catch (error) {
+	console.log('Usando configuración por defecto');
+}
+---
+
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="generator" content={Astro.generator} />
+		<title>UCASAL - Consultar Exámenes</title>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+	</head>
+	<body class="min-h-screen flex items-center justify-center">
+		<!-- Background con overlay -->
+		<div class="fixed inset-0 z-0">
+			<div class="absolute inset-0 bg-cover bg-center bg-no-repeat" 
+				 style={`background-image: url('${configuracion.backgroundImage}')`}>
+			</div>
+			<!-- Overlay con degradado y líneas verticales como en la imagen -->
+			<div class="absolute inset-0 bg-gradient-to-r from-purple-900/90 via-red-900/80 to-red-800/90"></div>
+			<!-- Líneas verticales para simular el efecto de la imagen -->
+			<div class="absolute inset-0 opacity-20">
+				<div class="h-full flex">
+					<div class="w-px bg-white/30"></div>
+					<div class="flex-1"></div>
+					<div class="w-px bg-white/30"></div>
+					<div class="flex-1"></div>
+					<div class="w-px bg-white/30"></div>
+					<div class="flex-1"></div>
+					<div class="w-px bg-white/30"></div>
+					<div class="flex-1"></div>
+					<div class="w-px bg-white/30"></div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Contenido principal -->
+		<div class="relative z-10 w-full max-w-md mx-auto px-6">
+			<!-- Logo y título -->
+			<div class="text-center mb-12">
+				<div class="mb-6">
+					<h1 class="text-white text-4xl font-bold tracking-wide mb-2">
+						UCASAL
+						<span class="text-red-300 font-light ml-2">▷</span>
+					</h1>
+					<p class="text-red-200 text-sm font-light tracking-widest">
+						Educación Digital
+					</p>
+				</div>
+				
+				<h2 class="text-white text-2xl font-semibold mb-8 leading-tight">
+					{configuracion.titulo}
+				</h2>
+			</div>
+
+			<!-- Formulario de consulta -->
+			<form id="consultaForm" class="space-y-4">
+				<div class="relative">
+					<input
+						type="text"
+						id="dni"
+						name="dni"
+						placeholder="Ingresá tu DNI"
+						required
+						pattern="[0-9]{7,8}"
+						maxlength="8"
+						class="w-full px-6 py-4 rounded-full text-gray-800 text-lg font-medium placeholder-gray-500 border-none focus:outline-none focus:ring-4 focus:ring-white/30 shadow-lg"
+					/>
+				</div>
+				
+				<button
+					type="submit"
+					class="w-full text-white font-semibold py-4 px-8 rounded-full text-lg transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-4 shadow-lg flex items-center justify-center space-x-2"
+					style={`background-color: ${configuracion.colorPrimario || '#dc2626'}; --hover-color: ${configuracion.colorSecundario || '#991b1b'};`}
+				>
+					<span>Ir</span>
+					<span class="text-xl">▶</span>
+				</button>
+			</form>
+
+			<!-- Mensaje de error/loading -->
+			<div id="mensaje" class="mt-6 text-center text-white opacity-0 transition-opacity duration-300"></div>
+		</div>
+
+		<!-- Resultados (inicialmente oculto) -->
+		<div id="resultados" class="fixed inset-0 z-20 bg-black/95 hidden">
+			<div class="min-h-screen flex items-center justify-center p-6">
+				<div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+					<div class="p-6">
+						<div class="flex justify-between items-center mb-6">
+							<h3 class="text-2xl font-bold text-gray-800">Mis Exámenes</h3>
+							<button id="cerrarResultados" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+						</div>
+						<div id="listaExamenes" class="space-y-4">
+							<!-- Los exámenes se cargarán aquí dinámicamente -->
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<style define:vars={{ 
+			colorPrimario: configuracion.colorPrimario || '#dc2626',
+			colorSecundario: configuracion.colorSecundario || '#991b1b'
+		}}>
+			body {
+				font-family: 'Inter', sans-serif;
+				overflow-x: hidden;
+			}
+			
+			/* Botón dinámico */
+			button[type="submit"]:hover {
+				background-color: var(--colorSecundario) !important;
+			}
+			
+			/* Animaciones */
+			.animate-pulse-slow {
+				animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+			}
+			
+			/* Responsive */
+			@media (max-width: 640px) {
+				.text-4xl { font-size: 2.5rem; }
+				.text-2xl { font-size: 1.75rem; }
+			}
+		</style>
+
+		<script>
+			const API_BASE_URL = 'http://localhost:3000/api/v1';
+			
+			// Manejar envío del formulario
+			document.getElementById('consultaForm').addEventListener('submit', async (e) => {
+				e.preventDefault();
+				
+				const dni = document.getElementById('dni').value.trim();
+				const mensaje = document.getElementById('mensaje');
+				const resultados = document.getElementById('resultados');
+				const listaExamenes = document.getElementById('listaExamenes');
+				
+				if (!dni || dni.length < 7) {
+					mostrarMensaje('Por favor ingresa un DNI válido (7-8 dígitos)', 'error');
+					return;
+				}
+				
+				mostrarMensaje('Buscando exámenes...', 'loading');
+				
+				try {
+					const response = await fetch(`${API_BASE_URL}/estudiantes/examenes/${dni}`);
+					
+					if (!response.ok) {
+						throw new Error('Error al consultar los datos');
+					}
+					
+					const data = await response.json();
+					
+					if (!data.success || !data.data || !data.data.examenes || data.data.examenes.length === 0) {
+						mostrarMensaje('No se encontraron exámenes para este DNI', 'error');
+						return;
+					}
+					
+					mostrarExamenes(data.data.examenes, data.data.estudiante);
+					
+				} catch (error) {
+					console.error('Error:', error);
+					mostrarMensaje('Error al consultar los exámenes. Intenta nuevamente.', 'error');
+				}
+			});
+			
+			// Mostrar mensajes
+			function mostrarMensaje(texto, tipo) {
+				const mensaje = document.getElementById('mensaje');
+				mensaje.textContent = texto;
+				mensaje.className = `mt-6 text-center transition-opacity duration-300 ${
+					tipo === 'error' ? 'text-red-300' : 
+					tipo === 'loading' ? 'text-yellow-300' : 'text-green-300'
+				}`;
+				mensaje.style.opacity = '1';
+				
+				if (tipo !== 'loading') {
+					setTimeout(() => {
+						mensaje.style.opacity = '0';
+					}, 5000);
+				}
+			}
+			
+			// Mostrar exámenes en modal
+			function mostrarExamenes(examenes, estudiante) {
+				const listaExamenes = document.getElementById('listaExamenes');
+				const resultados = document.getElementById('resultados');
+				
+				// Limpiar mensaje
+				document.getElementById('mensaje').style.opacity = '0';
+				
+				// Actualizar título con nombre del estudiante
+				document.querySelector('#resultados h3').textContent = `Exámenes de ${estudiante.nombre} ${estudiante.apellido}`;
+				
+				// Generar HTML de exámenes
+				listaExamenes.innerHTML = examenes.map(examen => `
+					<div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+						<div class="flex justify-between items-start mb-2">
+							<h4 class="font-semibold text-lg text-gray-800">${examen.nombreMateria}</h4>
+							<span class="text-sm text-gray-500">${examen.carrera}</span>
+						</div>
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
+							<div><strong>Fecha:</strong> ${new Date(examen.fecha).toLocaleDateString('es-AR')}</div>
+							<div><strong>Hora:</strong> ${examen.hora || 'Por confirmar'}</div>
+							<div><strong>Aula:</strong> ${examen.aula || 'Por asignar'}</div>
+							<div><strong>Tipo:</strong> ${examen.tipoExamen || 'Regular'}</div>
+							${examen.modalidadExamen ? `<div><strong>Modalidad:</strong> ${examen.modalidadExamen}</div>` : ''}
+							${examen.requierePc ? `<div class="text-orange-600"><strong>Requiere PC</strong></div>` : ''}
+						</div>
+						${examen.materialPermitido ? `<div class="mt-2 text-sm text-green-600"><strong>Material permitido:</strong> ${examen.materialPermitido}</div>` : ''}
+						${examen.observaciones ? `<div class="mt-2 text-sm text-blue-600"><strong>Observaciones:</strong> ${examen.observaciones}</div>` : ''}
+					</div>
+				`).join('');
+				
+				// Mostrar modal
+				resultados.classList.remove('hidden');
+				document.body.style.overflow = 'hidden';
+			}
+			
+			// Cerrar modal de resultados
+			document.getElementById('cerrarResultados').addEventListener('click', () => {
+				document.getElementById('resultados').classList.add('hidden');
+				document.body.style.overflow = 'auto';
+				document.getElementById('dni').value = '';
+			});
+			
+			// Cerrar modal con Escape
+			document.addEventListener('keydown', (e) => {
+				if (e.key === 'Escape' && !document.getElementById('resultados').classList.contains('hidden')) {
+					document.getElementById('cerrarResultados').click();
+				}
+			});
+		</script>
+	</body>
+</html>
