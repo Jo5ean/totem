@@ -136,9 +136,7 @@ El nuevo sistema TOTEM centralizado reemplaza el sistema anterior de sincronizac
 
 **Eliminados:**
 - ❌ `cronogramaService.js`
-- ❌ `csvDownloadService.js` 
 - ❌ Endpoints `/api/v1/cronogramas/*`
-- ❌ Carpeta `csv_downloads/`
 
 **Agregados:**
 - ✅ `totemService.js`
