@@ -1,0 +1,289 @@
+---
+import ExamModal from '../../components/ExamModal.astro';
+---
+<!-- SECCIÓN 2: Aplicación Principal -->
+<div id="appSection" class="h-screen relative overflow-hidden">
+    <!-- Imagen de fondo para la consulta -->
+    <div
+        class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style="background-image: url('/images/fondo.jpg')"
+    ></div>
+    
+    <!-- Overlay con degradado horizontal y blur -->
+    <div 
+        id="appOverlay" 
+        class="absolute inset-0 opacity-100 transition-all duration-1000 backdrop-blur-sm"
+        style="background: linear-gradient(to right, #004180cc, #c7181fcc)"
+    ></div>
+    
+    <!-- Capa adicional para oscurecer -->
+    <div 
+        id="appDarkLayer"
+        class="absolute inset-0 bg-black/40 opacity-100 transition-opacity duration-1000"
+    ></div>
+
+    <!-- Contenido de la aplicación -->
+    <div class="relative z-10 h-full flex flex-col items-center justify-center px-6 gap-12 pb-24" id="appContent">
+        
+        <!-- Logo centrado -->
+        <div class="animate-fade-in">
+            <img
+                src="/logos/ucasalx_logo.png"
+                alt="UCASAL Logo"
+                class="h-24 md:h-40 lg:h-48"
+            />
+        </div>
+
+        <!-- Contenido centrado (título y formulario) -->
+        <div class="flex flex-col items-center gap-8 animate-fade-in w-full">
+            <!-- Título -->
+            <h1 class="text-white text-2xl md:text-3xl lg:text-5xl font-semibold text-center animate-slide-down">
+                Consulta donde rendis tu examen
+            </h1>
+            
+            <!-- Formulario -->
+            <form id="examForm" class="w-full max-w-lg animate-slide-up" onsubmit="return false;">
+                <div class="flex gap-4">
+                    <!-- Input DNI -->
+                    <input
+                        id="dniInput"
+                        type="text"
+                        placeholder="Ingresa tu DNI"
+                        class="flex-1 px-6 py-4 text-lg rounded-lg text-white placeholder-gray-200 border-2 border-white bg-white/10 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/50 focus:bg-white/20 text-center transition-all duration-300 hover:bg-white/15"
+                        maxlength="8"
+                        pattern="[0-9]{7,8}"
+                        required
+                    />
+                    
+                    <!-- Botón Ir -->
+                    <button
+                        id="searchBtn"
+                        type="submit"
+                        class="px-8 py-4 text-lg bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 hover:scale-105 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-500/50 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <span id="searchBtnText">→</span>
+                        <span id="searchBtnLoader" class="hidden">
+                            <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </span>
+                    </button>
+                </div>
+                
+                <!-- Mensaje de error -->
+                <div id="errorMessage" class="hidden mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                    <p class="text-sm">Por favor, ingresa un DNI válido (7-8 dígitos).</p>
+                </div>
+                
+                <!-- Mensaje de "no encontrado" -->
+                <div id="notFoundMessage" class="hidden mt-4 p-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded-lg">
+                    <p class="text-sm">No se encontraron exámenes para el DNI ingresado. Verifica que el número sea correcto.</p>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Incluir el componente del modal -->
+<ExamModal />
+
+<style>
+  /* Animaciones */
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .animate-fade-in {
+    animation: fade-in 1s ease-out;
+  }
+  
+  @keyframes slide-down {
+    from { opacity: 0; transform: translateY(-30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .animate-slide-down {
+    animation: slide-down 1s ease-out 0.5s both;
+  }
+  
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .animate-slide-up {
+    animation: slide-up 1s ease-out 1s both;
+  }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('examForm') as HTMLFormElement;
+        const dniInput = document.getElementById('dniInput') as HTMLInputElement;
+        const searchBtn = document.getElementById('searchBtn') as HTMLButtonElement;
+        const searchBtnText = document.getElementById('searchBtnText');
+        const searchBtnLoader = document.getElementById('searchBtnLoader');
+        const errorMessage = document.getElementById('errorMessage');
+        const notFoundMessage = document.getElementById('notFoundMessage');
+        
+        // Función para mostrar el estado de carga
+        function showLoading() {
+            if (searchBtn) searchBtn.disabled = true;
+            searchBtnText?.classList.add('hidden');
+            searchBtnLoader?.classList.remove('hidden');
+        }
+        
+        // Función para ocultar el estado de carga
+        function hideLoading() {
+            if (searchBtn) searchBtn.disabled = false;
+            searchBtnText?.classList.remove('hidden');
+            searchBtnLoader?.classList.add('hidden');
+        }
+        
+        // Función para mostrar mensaje de error
+        function showError() {
+            errorMessage?.classList.remove('hidden');
+            notFoundMessage?.classList.add('hidden');
+        }
+        
+        // Función para mostrar mensaje de "no encontrado"
+        function showNotFound() {
+            notFoundMessage?.classList.remove('hidden');
+            errorMessage?.classList.add('hidden');
+        }
+        
+        // Función para ocultar mensajes
+        function hideMessages() {
+            errorMessage?.classList.add('hidden');
+            notFoundMessage?.classList.add('hidden');
+        }
+        
+        // Validación del DNI
+        function validateDNI(dni: string): boolean {
+            const dniRegex = /^[0-9]{7,8}$/;
+            return dniRegex.test(dni);
+        }
+        
+        // Simular búsqueda de examen con múltiples exámenes
+        function searchExam(dni: string): Promise<{found: boolean; examData?: any}> {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    console.log('Buscando examen para DNI:', dni);
+                    
+                    // Simulamos diferentes escenarios
+                    const scenarios = [
+                        // Caso 1: Un solo examen
+                        {
+                            found: true,
+                            examData: {
+                                dni: dni,
+                                estudiante: { nombre: "María González", carrera: "Lic. en Administración" },
+                                examenes: [
+                                    {
+                                        materia: "SISTEMAS ADM. CONTABLES",
+                                        fecha: "Hoy - 5 Jun",
+                                        hora: "14:00",
+                                        aula: "Aula 203",
+                                        tipo: "Escrito",
+                                        profesor: "JOSE A. LAMAS"
+                                    }
+                                ]
+                            }
+                        },
+                        // Caso 2: Múltiples exámenes
+                        {
+                            found: true,
+                            examData: {
+                                dni: dni,
+                                estudiante: { nombre: "Carlos Mendoza", carrera: "Lic. en Economía" },
+                                examenes: [
+                                    {
+                                        materia: "MICROECONOMÍA AVANZADA",
+                                        fecha: "Hoy - 5 Jun",
+                                        hora: "14:00",
+                                        aula: "Aula 101",
+                                        tipo: "Escrito",
+                                        profesor: "NICOLAS LIENDRO"
+                                    },
+                                    {
+                                        materia: "ESTADÍSTICA APLICADA",
+                                        fecha: "Mañana - 6 Jun",
+                                        hora: "16:00",
+                                        aula: "Aula 205",
+                                        tipo: "Oral",
+                                        profesor: "ROBERTO CADAR"
+                                    }
+                                ]
+                            }
+                        }
+                    ];
+                    
+                    // Alternamos entre escenarios para testing
+                    const scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+                    resolve(scenario);
+                }, 1500);
+            });
+        }
+        
+        // Event listener para el input DNI (solo números)
+        dniInput?.addEventListener('input', function(e) {
+            // Permitir solo números
+            const target = e.target as HTMLInputElement;
+            if (target) {
+                target.value = target.value.replace(/[^0-9]/g, '');
+            }
+            hideMessages();
+        });
+        
+        // Event listener para el formulario
+        form?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const dni = dniInput?.value.trim() || '';
+            
+            if (!dni) {
+                showError();
+                return;
+            }
+            
+            if (!validateDNI(dni)) {
+                showError();
+                return;
+            }
+            
+            hideMessages();
+            showLoading();
+            
+            try {
+                const result = await searchExam(dni);
+                
+                if (result.found) {
+                    console.log('Examen encontrado! Abriendo modal...');
+                    
+                    // Usar el componente ExamModal
+                    const ExamModal = (window as any).ExamModal;
+                    if (ExamModal) {
+                        ExamModal.setCurrentExamData(result.examData);
+                        ExamModal.openExamModal();
+                    }
+                } else {
+                    showNotFound();
+                }
+            } catch (error) {
+                console.error('Error al buscar examen:', error);
+                showError();
+            } finally {
+                hideLoading();
+            }
+        });
+        
+        // Event listener para el botón (alternativo)
+        searchBtn?.addEventListener('click', function(e) {
+            const target = e.target as HTMLButtonElement;
+            if (target?.type === 'submit') return; // Ya lo maneja el form
+            form?.dispatchEvent(new Event('submit'));
+        });
+    });
+</script>

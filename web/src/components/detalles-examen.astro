@@ -1,0 +1,314 @@
+---
+import Layout from "../layouts/Layout.astro"
+---
+
+<Layout title="Detalles del Examen - UCASAL">
+  
+  <!-- Header -->
+  <div class="bg-gradient-to-r from-blue-900 to-red-600 text-white py-6 px-4">
+    <div class="max-w-4xl mx-auto">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold">UCASAL - Universidad Católica de Salta</h1>
+          <p class="text-blue-100">Sistema de Consulta de Exámenes</p>
+        </div>
+        <div class="hidden md:block">
+          <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+            <span class="text-2xl">🎓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenido Principal -->
+  <div class="max-w-4xl mx-auto py-8 px-4">
+    
+    <!-- Loading State -->
+    <div id="loadingState" class="text-center py-12">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <p class="text-gray-600">Cargando información del examen...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="hidden">
+      <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+        <div class="text-red-500 text-5xl mb-4">⚠️</div>
+        <h2 class="text-xl font-bold text-red-800 mb-2">Error al cargar la información</h2>
+        <p class="text-red-600 mb-4">No se pudo procesar la información del examen.</p>
+        <a href="/" class="inline-block bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors">
+          Volver al inicio
+        </a>
+      </div>
+    </div>
+
+    <!-- Exam Details -->
+    <div id="examDetails" class="hidden">
+      
+      <!-- Student Info Card -->
+      <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <div class="flex items-center mb-4">
+          <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+            <span class="text-blue-600 text-xl">👤</span>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-gray-800">Información del Estudiante</h2>
+            <p class="text-gray-600">Datos personales y académicos</p>
+          </div>
+        </div>
+        <div class="grid md:grid-cols-3 gap-4">
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <p class="text-sm text-gray-600 mb-1">Nombre Completo</p>
+            <p class="font-semibold text-gray-800" id="studentName">-</p>
+          </div>
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <p class="text-sm text-gray-600 mb-1">DNI</p>
+            <p class="font-semibold text-gray-800" id="studentDNI">-</p>
+          </div>
+          <div class="bg-gray-50 p-4 rounded-lg">
+            <p class="text-sm text-gray-600 mb-1">Carrera</p>
+            <p class="font-semibold text-gray-800" id="studentCareer">-</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Exams List -->
+      <div id="examsList">
+        <!-- Los exámenes se cargan dinámicamente -->
+      </div>
+
+      <!-- Actions -->
+      <div class="bg-white rounded-xl shadow-lg p-6 mt-6">
+        <h3 class="text-lg font-bold text-gray-800 mb-4">Opciones</h3>
+        <div class="grid md:grid-cols-3 gap-4">
+                     <button id="shareEmail" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+             </svg>
+             Compartir por Email
+           </button>
+          
+          <button id="printDetails" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+            </svg>
+            Imprimir
+          </button>
+          
+          <a href="/" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            </svg>
+            Nueva Consulta
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-gray-800 text-white py-8 px-4 mt-16">
+    <div class="max-w-4xl mx-auto text-center">
+      <div class="mb-4">
+        <h3 class="text-lg font-bold mb-2">Universidad Católica de Salta</h3>
+        <p class="text-gray-300">Sistema de Consulta de Exámenes - Totem Digital</p>
+      </div>
+      <div class="text-sm text-gray-400">
+        <p>© 2024 UCASAL. Todos los derechos reservados.</p>
+        <p class="mt-2">Para consultas: examenes@ucasal.edu.ar</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Variables globales
+    let examData: any = null;
+
+    // Función para obtener parámetros de la URL 
+    function getURLParameter(name: string) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(name);
+    }
+
+    // Función para decodificar los datos del examen
+    function decodeExamData() {
+      try {
+        const encodedData = getURLParameter('data');
+        if (!encodedData) {
+          throw new Error('No se encontraron datos en la URL');
+        }
+        
+        const decodedData = JSON.parse(atob(encodedData));
+        return decodedData;
+      } catch (error) {
+        console.error('Error decodificando datos:', error);
+        return null;
+      }
+    }
+
+         // Función para mostrar la información del estudiante
+     function displayStudentInfo(data: any) {
+       const studentName = document.getElementById('studentName');
+       const studentDNI = document.getElementById('studentDNI');
+       const studentCareer = document.getElementById('studentCareer');
+       
+       if (studentName) studentName.textContent = data.estudiante.nombre;
+       if (studentDNI) studentDNI.textContent = data.dni;
+       if (studentCareer) studentCareer.textContent = data.estudiante.carrera;
+     }
+
+     // Función para mostrar los exámenes
+     function displayExams(exams: any[]) {
+       const examsList = document.getElementById('examsList');
+      
+             if (examsList) {
+         examsList.innerHTML = exams.map((exam: any, index: number) => {
+        const isToday = exam.fecha.includes('Hoy');
+        return `
+          <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <!-- Header del examen -->
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center">
+                <div class="w-12 h-12 ${isToday ? 'bg-red-100' : 'bg-blue-100'} rounded-full flex items-center justify-center mr-4">
+                  <span class="${isToday ? 'text-red-600' : 'text-blue-600'} text-xl">📝</span>
+                </div>
+                <div>
+                  <h3 class="text-xl font-bold text-gray-800">${exam.materia}</h3>
+                  <p class="${isToday ? 'text-red-600' : 'text-blue-600'} font-semibold">${exam.fecha}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="text-3xl font-bold ${isToday ? 'text-red-600' : 'text-blue-600'}">${exam.hora}</p>
+                <p class="text-sm text-gray-500">Horario</p>
+              </div>
+            </div>
+            
+            <!-- Detalles del examen -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div class="bg-gray-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600 mb-1">📍 Ubicación</p>
+                <p class="font-semibold text-gray-800">${exam.aula}</p>
+              </div>
+              <div class="bg-gray-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600 mb-1">📝 Tipo de Examen</p>
+                <p class="font-semibold text-gray-800">${exam.tipo}</p>
+              </div>
+              <div class="bg-gray-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600 mb-1">👨‍🏫 Profesor</p>
+                <p class="font-semibold text-gray-800">${exam.profesor}</p>
+              </div>
+              <div class="bg-gray-50 p-4 rounded-lg">
+                <p class="text-sm text-gray-600 mb-1">🏢 Sector</p>
+                <p class="font-semibold text-gray-800">Sector ${exam.sector || 'A'}</p>
+              </div>
+            </div>
+            
+            <!-- Información adicional -->
+            <div class="border-t pt-4">
+              <h4 class="font-semibold text-gray-800 mb-3">📋 Información Importante</h4>
+              <div class="grid md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p class="text-gray-600 mb-2"><strong>• Modalidad:</strong> ${exam.tipo}</p>
+                  <p class="text-gray-600 mb-2"><strong>• Duración estimada:</strong> ${exam.tipo === 'Escrito' ? '2-3 horas' : '30-45 minutos'}</p>
+                  <p class="text-gray-600 mb-2"><strong>• Presentarse:</strong> 15 minutos antes</p>
+                </div>
+                <div>
+                  <p class="text-gray-600 mb-2"><strong>• Documentación:</strong> DNI original</p>
+                  <p class="text-gray-600 mb-2"><strong>• Cátedra:</strong> ${exam.profesor}</p>
+                  <p class="text-gray-600 mb-2"><strong>• Contacto:</strong> examenes@ucasal.edu.ar</p>
+                </div>
+              </div>
+            </div>
+            
+            ${isToday ? `
+            <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p class="text-red-800 font-semibold text-center">
+                🚨 ¡EXAMEN HOY! - Asegúrate de llegar con tiempo suficiente
+              </p>
+            </div>
+            ` : ''}
+                     </div>
+         `;
+       }).join('');
+       }
+     }
+
+         // Función para generar contenido de email
+     function generateEmailContent(): {subject: string, body: string} {
+       if (!examData) return {subject: '', body: ''};
+       
+       const subject = `UCASAL - Información de Exámenes - ${examData.estudiante.nombre}`;
+       
+       let body = `Estimado/a ${examData.estudiante.nombre},\n\n`;
+       body += `Aquí tienes la información detallada de tus próximos exámenes en UCASAL:\n\n`;
+       body += `📚 Carrera: ${examData.estudiante.carrera}\n`;
+       body += `🆔 DNI: ${examData.dni}\n\n`;
+       body += `📝 EXÁMENES:\n`;
+       body += `${'='.repeat(50)}\n\n`;
+       
+       examData.examenes.forEach((exam: any, index: number) => {
+         body += `${index + 1}. ${exam.materia}\n`;
+         body += `   📅 Fecha: ${exam.fecha}\n`;
+         body += `   ⏰ Hora: ${exam.hora}\n`;
+         body += `   📍 Aula: ${exam.aula}\n`;
+         body += `   👨‍🏫 Profesor: ${exam.profesor}\n`;
+         body += `   📝 Tipo: ${exam.tipo}\n\n`;
+       });
+       
+       body += `🔗 Ver información actualizada en: ${window.location.href}\n\n`;
+       body += `📞 Para consultas: examenes@ucasal.edu.ar\n\n`;
+       body += `¡Te deseamos mucho éxito en tus exámenes!\n\n`;
+       body += `Universidad Católica de Salta\nSistema de Consulta de Exámenes`;
+       
+       return {subject, body};
+     }
+
+    // Inicialización
+    document.addEventListener('DOMContentLoaded', function() {
+      const loadingState = document.getElementById('loadingState');
+      const errorState = document.getElementById('errorState');
+      const examDetails = document.getElementById('examDetails');
+      
+      // Simular carga
+      setTimeout(() => {
+        examData = decodeExamData();
+        
+        loadingState?.classList.add('hidden');
+        
+        if (examData) {
+          displayStudentInfo(examData);
+          displayExams(examData.examenes);
+          examDetails?.classList.remove('hidden');
+        } else {
+          errorState?.classList.remove('hidden');
+        }
+      }, 1500);
+      
+             // Event listeners
+       document.getElementById('shareEmail')?.addEventListener('click', function() {
+         const emailContent = generateEmailContent();
+         const encodedSubject = encodeURIComponent(emailContent.subject);
+         const encodedBody = encodeURIComponent(emailContent.body);
+         window.open(`mailto:?subject=${encodedSubject}&body=${encodedBody}`, '_blank');
+       });
+      
+      document.getElementById('printDetails')?.addEventListener('click', function() {
+        window.print();
+      });
+    });
+
+    // Estilos para impresión
+    const printStyles = `
+      <style media="print">
+        body { background: white !important; }
+        .bg-gradient-to-r, .bg-gray-800 { background: white !important; color: black !important; }
+        .bg-blue-100, .bg-red-100, .bg-gray-50 { background: #f8f9fa !important; }
+        button { display: none !important; }
+        .shadow-lg { box-shadow: none !important; border: 1px solid #ddd !important; }
+      </style>
+    `;
+    document.head.insertAdjacentHTML('beforeend', printStyles);
+  </script>
+
+</Layout> 

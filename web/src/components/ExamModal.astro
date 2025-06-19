@@ -1,0 +1,212 @@
+---
+// Propiedades simuladas del examen para mostrar datos ilustrativos
+const examData = {
+  estudiante: {
+    dni: "12345678",
+    nombre: "María González",
+    carrera: "Licenciatura en Administración"
+  },
+  examen: {
+    materia: "SISTEMAS ADMINISTRATIVOS CONTABLES",
+    codigo: "2120",
+    fecha: "5 de Junio, 2025",
+    hora: "14:00",
+    tipo: "Escrito en sede",
+    turno: "1° Turno Ordinario"
+  },
+  ubicacion: {
+    sector: "Economía y Administración",
+    aula: "Aula 203 - Edificio Principal",
+    direccion: "Campus UCASAL - Castañares 751"
+  },
+  profesor: {
+    nombre: "JOSE ALEJANDRO LAMAS",
+    catedra: "A",
+    email: "j.lamas@ucasal.edu.ar"
+  },
+  instrucciones: {
+    materialPermitido: "Calculadora, hojas en blanco proporcionadas por la universidad",
+    observaciones: "Presentarse 15 minutos antes del horario del examen. Traer documento de identidad.",
+    monitoreo: "PROCTORING",
+    responsable: "ANDREA TEJERINA"
+  }
+}
+---
+
+<!-- Modal de exámenes -->
+<div id="examModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300" style="z-index: 9999;">
+  <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl transform scale-95 transition-all duration-300">
+    
+    <!-- Header simplificado -->
+    <div class="bg-gradient-to-r from-blue-900 to-red-600 text-white p-4 rounded-t-2xl">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-bold">Información de Examen</h2>
+        <button id="closeModal" class="text-white/80 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Lista de exámenes optimizada -->
+    <div class="p-4" id="examsList">
+      <!-- Los exámenes se insertan dinámicamente aquí -->
+    </div>
+
+    <!-- Botón de cerrar centrado -->
+    <div class="p-4 border-t border-gray-200">
+      <button id="closeModalBtn" class="w-full py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors text-base">
+        Cerrar
+      </button>
+    </div>
+  </div>
+</div>
+
+
+
+<style>
+  #examModal {
+    z-index: 9999 !important;
+  }
+  
+  .modal-open {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    display: flex !important;
+  }
+  
+  .modal-open > div {
+    transform: scale(1) !important;
+  }
+  
+  /* Debug styles para verificar que el modal existe */
+  #examModal.modal-open {
+    background: rgba(0, 0, 0, 0.6) !important;
+  }
+  
+  /* Estilos para modal QR */
+  #qrModal {
+    z-index: 10000 !important;
+  }
+  
+  #qrModal.modal-open {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    display: flex !important;
+  }
+  
+  #qrModal.modal-open > div {
+    transform: scale(1) !important;
+  }
+</style>
+
+<script>
+    // Variables globales para los modales
+    let currentExamData: any = null;
+
+    // Funciones del modal
+    function openExamModal() {
+        console.log('Intentando abrir modal...');
+        const modal = document.getElementById('examModal');
+        if (modal && currentExamData) {
+            populateModal(currentExamData);
+            modal.classList.add('modal-open');
+            
+            // Bloquear scroll cuando el modal esté abierto
+            document.body.style.overflow = 'hidden';
+        } else {
+            console.error('Modal element o datos no encontrados!');
+        }
+    }
+    
+    function closeModal() {
+        const modal = document.getElementById('examModal');
+        modal?.classList.remove('modal-open');
+        
+        // Desbloquear scroll
+        document.body.style.overflow = 'auto';
+        
+        // Resetear: volver a la primera sección (video)
+        setTimeout(() => {
+            const videoSection = document.getElementById('videoSection');
+            if (videoSection) {
+                videoSection.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start' 
+                });
+            }
+        }, 300);
+    }
+    
+
+    
+    // Poblar el modal con datos de exámenes (optimizado para claridad máxima)
+    function populateModal(data: any) {
+        const examsList = document.getElementById('examsList');
+        
+        if (examsList) {
+            examsList.innerHTML = data.examenes.map((exam: any, index: number) => `
+                <div class="mb-6 ${index > 0 ? 'border-t pt-6' : ''}">
+                    <!-- HORA - Elemento más prominente -->
+                    <div class="text-center mb-4">
+                        <div class="inline-block bg-red-600 text-white px-8 py-4 rounded-2xl">
+                            <span class="text-3xl font-bold">${exam.hora}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- MATERIA - Segundo elemento más importante -->
+                    <div class="text-center mb-4">
+                        <h3 class="text-xl font-bold text-gray-800 leading-tight">${exam.materia}</h3>
+                    </div>
+                    
+                    <!-- FECHA y AULA en grid claro -->
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div class="bg-blue-50 p-3 rounded-lg">
+                            <p class="text-sm text-blue-600 font-medium mb-1">FECHA</p>
+                            <p class="text-lg font-bold text-blue-800">${exam.fecha}</p>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded-lg">
+                            <p class="text-sm text-green-600 font-medium mb-1">AULA</p>
+                            <p class="text-lg font-bold text-green-800">${exam.aula}</p>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+    
+
+
+    // Event listeners cuando el DOM esté listo
+    document.addEventListener('DOMContentLoaded', function() {
+        const closeModalBtn = document.getElementById('closeModal');
+        const closeModalFooter = document.getElementById('closeModalBtn');
+        const modal = document.getElementById('examModal');
+
+        // Event listeners para el modal principal
+        closeModalBtn?.addEventListener('click', closeModal);
+        closeModalFooter?.addEventListener('click', closeModal);
+        
+        // Cerrar modal al hacer click en el fondo
+        modal?.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+        
+        // Cerrar modal con tecla Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    });
+
+    // Exportar funciones para que puedan ser usadas desde otras secciones
+    (window as any).ExamModal = {
+        openExamModal,
+        closeModal,
+        setCurrentExamData: (data: any) => { currentExamData = data; }
+    };
+</script> 

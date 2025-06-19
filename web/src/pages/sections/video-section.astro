@@ -1,0 +1,72 @@
+<!-- SECCIÓN 1: Video Intro -->
+<div id="videoSection" class="h-screen relative overflow-hidden">
+    <!-- Video de fondo -->
+    <video 
+        id="bgVideo"
+        class="absolute inset-0 w-full h-full object-cover"
+        autoplay 
+        muted 
+        loop
+        poster="/images/fondo.jpg"
+    >
+        <source src="/videos/video.webm" type="video/webm">
+        <!-- Fallback a imagen si no hay video -->
+        <div class="absolute inset-0 bg-cover bg-center bg-no-repeat" style="background-image: url('/images/fondo.jpg')"></div>
+    </video>
+    
+    <!-- Overlay sutil para el video -->
+    <div class="absolute inset-0 bg-black/20"></div>
+    
+    <!-- Contenido del video -->
+    <div class="relative z-10 h-full flex flex-col items-center justify-end px-6 pb-24">
+   
+        <!-- Botón Comenzar -->
+        <button 
+            id="startBtn"
+            class="group relative px-12 py-4 text-xl md:text-2xl bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full transition-all duration-500 hover:scale-110 shadow-2xl hover:shadow-red-500/25 animate-pulse-slow"
+        >
+            <span class="relative z-10">Comenzar</span>
+            <div class="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        </button>
+    </div>
+</div>
+
+<style>
+  /* Animaciones para el video */
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse-slow 2s ease-in-out infinite;
+  }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const startBtn = document.getElementById('startBtn');
+        
+        // Función para hacer scroll suave hacia la sección de consulta
+        function scrollToAppSection() {
+            const appSection = document.getElementById('appSection');
+            if (appSection) {
+                appSection.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start' 
+                });
+            }
+        }
+        
+        // Event listener para el botón comenzar
+        startBtn?.addEventListener('click', scrollToAppSection);
+        
+        // También permitir comenzar con tecla Enter o Space
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                scrollToAppSection();
+            }
+        });
+    });
+</script>
