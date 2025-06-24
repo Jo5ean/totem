@@ -12,11 +12,14 @@ import {
   DocumentTextIcon,
   Bars3Icon,
   XMarkIcon,
+  CalendarIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
+  { name: 'Asignación Aulas', href: '/asignacion-aulas', icon: AcademicCapIcon },
   { name: 'Facultades', href: '/facultades', icon: BuildingOfficeIcon },
   { name: 'Mapeos Sectores', href: '/mapeos-sectores', icon: ArrowPathIcon },
   { name: 'Mapeos Carreras', href: '/mapeos-carreras', icon: DocumentTextIcon },
