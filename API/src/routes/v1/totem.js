@@ -1,22 +1,21 @@
 import express from 'express';
 import TotemService from '../../services/totemService.js';
-import CSVDownloadService from '../../services/csvDownloadService.js';
+import SheetBestService from '../../services/sheetBestService.js';
 
 const router = express.Router();
 const totemService = new TotemService();
-const csvService = new CSVDownloadService();
-const TOTEM_SHEET_ID = '12_tx2DXfebO-5SjRTiRTg3xebVR1x-5xJ_BFY7EPaS8';
+const sheetBestService = new SheetBestService();
 
-// POST /api/v1/totem/sync - Sincronizar datos del TOTEM
+// POST /api/v1/totem/sync - Sincronizar datos del TOTEM usando Sheet.best
 router.post('/sync', async (req, res) => {
   try {
-    console.log('Iniciando sincronización TOTEM centralizada...');
+    console.log('Iniciando sincronización TOTEM con Sheet.best...');
     
     const result = await totemService.syncTotemData();
     
     return res.status(200).json({
       success: true,
-      message: 'Sincronización TOTEM completada exitosamente',
+      message: 'Sincronización TOTEM completada exitosamente con Sheet.best',
       data: result
     });
     
@@ -30,89 +29,92 @@ router.post('/sync', async (req, res) => {
   }
 });
 
-// GET /api/v1/totem/detect-sheets - Detectar hojas disponibles
+// GET /api/v1/totem/detect-sheets - Detectar datos disponibles desde Sheet.best
 router.get('/detect-sheets', async (req, res) => {
   try {
-    console.log('🔍 Probando detección automática de hojas...');
+    console.log('🔍 Obteniendo datos desde Sheet.best...');
     
     const startTime = Date.now();
     
-    // Detectar hojas disponibles
-    const detectedSheets = await csvService.detectAvailableSheets(TOTEM_SHEET_ID);
+    // Obtener y procesar datos desde Sheet.best
+    const result = await sheetBestService.fetchAndProcessData();
     
-    // Obtener nombres para procesamiento
-    const sheetNames = await csvService.getSheetNamesToProcess(TOTEM_SHEET_ID);
+    // Detectar tipos y categorías
+    const analysis = sheetBestService.detectExamTypes(result.data);
     
     const duration = Date.now() - startTime;
     
     return res.status(200).json({
       success: true,
       data: {
-        detectedSheets,
-        sheetNamesForProcessing: sheetNames,
-        totalDetected: detectedSheets.length,
-        totalForProcessing: sheetNames.length,
+        source: 'sheet.best',
+        totalRows: result.metadata.totalRows,
+        validRows: result.metadata.validRows,
+        examTypes: analysis.examTypes,
+        sectors: analysis.sectors,
+        careers: analysis.careers,
         detectionTime: `${duration}ms`
       },
-      message: `Detección completada: ${detectedSheets.length} hojas encontradas`
+      message: `Datos obtenidos desde Sheet.best: ${result.metadata.validRows} filas válidas encontradas`
     });
     
   } catch (error) {
-    console.error('❌ Error en detección de hojas:', error);
+    console.error('❌ Error obteniendo datos desde Sheet.best:', error);
     return res.status(500).json({
       success: false,
-      error: 'Error detectando hojas',
+      error: 'Error obteniendo datos desde Sheet.best',
       message: error.message
     });
   }
 });
 
-// GET /api/v1/totem/hojas-disponibles - Listar hojas disponibles
+// GET /api/v1/totem/hojas-disponibles - Información disponible desde Sheet.best
 router.get('/hojas-disponibles', async (req, res) => {
   try {
-    const hojas = await csvService.detectAvailableSheets(TOTEM_SHEET_ID);
+    const result = await sheetBestService.fetchAndProcessData();
+    const analysis = sheetBestService.detectExamTypes(result.data);
     
     return res.status(200).json({
       success: true,
-      data: hojas,
-      total: hojas.length
+      data: {
+        source: 'sheet.best',
+        totalRows: result.metadata.totalRows,
+        validRows: result.metadata.validRows,
+        availableData: {
+          examTypes: analysis.examTypes,
+          sectors: analysis.sectors,
+          careers: analysis.careers
+        }
+      },
+      total: result.metadata.validRows
     });
     
   } catch (error) {
-    console.error('Error obteniendo hojas disponibles:', error);
+    console.error('Error obteniendo datos disponibles:', error);
     return res.status(500).json({
       success: false,
-      error: 'Error obteniendo hojas disponibles',
+      error: 'Error obteniendo datos disponibles',
       message: error.message
     });
   }
 });
 
-// GET /api/v1/totem/csv-download - Descargar y procesar CSV
+// GET /api/v1/totem/csv-download - Obtener datos desde Sheet.best
 router.get('/csv-download', async (req, res) => {
   try {
-    const { sheetName } = req.query;
-    
-    if (!sheetName) {
-      return res.status(400).json({
-        success: false,
-        error: 'Parámetro sheetName requerido'
-      });
-    }
-    
-    const result = await csvService.downloadAndParseCSV(TOTEM_SHEET_ID, sheetName);
+    const result = await sheetBestService.fetchAndProcessData();
     
     return res.status(200).json({
       success: true,
       data: result,
-      message: `CSV de ${sheetName} descargado y procesado exitosamente`
+      message: 'Datos obtenidos desde Sheet.best exitosamente'
     });
     
   } catch (error) {
-    console.error('Error en descarga CSV:', error);
+    console.error('Error obteniendo datos desde Sheet.best:', error);
     return res.status(500).json({
       success: false,
-      error: 'Error descargando CSV',
+      error: 'Error obteniendo datos desde Sheet.best',
       message: error.message
     });
   }
@@ -202,8 +204,7 @@ router.get('/consulta', async (req, res) => {
     
     return res.status(200).json({
       success: true,
-      data: resultado,
-      tipo
+      data: resultado
     });
     
   } catch (error) {
@@ -225,7 +226,7 @@ router.get('/', (req, res) => {
       sync: 'POST /sync - Sincronizar datos del TOTEM',
       detectSheets: 'GET /detect-sheets - Detectar hojas disponibles',
       hojasDisponibles: 'GET /hojas-disponibles - Listar hojas',
-      csvDownload: 'GET /csv-download?sheetName=X - Descargar CSV',
+      csvDownload: 'GET /csv-download - Descargar datos desde Sheet.best',
       debug: 'GET /debug - Debug del procesamiento',
       debugProcessing: 'GET /debug-processing - Debug detallado',
       estadisticas: 'GET /estadisticas - Estadísticas del TOTEM',

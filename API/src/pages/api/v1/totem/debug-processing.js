@@ -1,9 +1,8 @@
 import TotemService from '../../../../services/totemService.js';
-import CSVDownloadService from '../../../../services/csvDownloadService.js';
+import SheetBestService from '../../../../services/sheetBestService.js';
 
 const totemService = new TotemService();
-const csvService = new CSVDownloadService();
-const TOTEM_SHEET_ID = '12_tx2DXfebO-5SjRTiRTg3xebVR1x-5xJ_BFY7EPaS8';
+const sheetBestService = new SheetBestService();
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -15,15 +14,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('🔍 Debug del procesamiento de exámenes...');
+    console.log('🔍 Debug del procesamiento de exámenes con Sheet.best...');
     
-    // 1. Obtener datos CSV de una sola hoja
-    const csvResult = await csvService.downloadAndParseCSV(TOTEM_SHEET_ID, 'Especial Junio');
+    // 1. Obtener datos desde Sheet.best
+    const result = await sheetBestService.fetchAndProcessData();
     
-    console.log(`📊 Datos obtenidos: ${csvResult.parsedData.length} filas`);
+    console.log(`📊 Datos obtenidos: ${result.data.length} filas válidas`);
     
     // 2. Tomar las primeras 3 filas para analizar
-    const sampleRows = csvResult.parsedData.slice(0, 3);
+    const sampleRows = result.data.slice(0, 3);
     
     const processingResults = [];
     
@@ -95,7 +94,9 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       debug: {
-        totalRowsInCSV: csvResult.parsedData.length,
+        source: 'sheet.best',
+        totalRowsFromAPI: result.metadata.totalRows,
+        validRowsProcessed: result.data.length,
         sampleRowsAnalyzed: sampleRows.length,
         processingResults,
         summary: {
@@ -105,7 +106,7 @@ export default async function handler(req, res) {
           wouldCreateExam: processingResults.filter(r => r.wouldCreateExam).length
         }
       },
-      message: 'Debug de procesamiento completado'
+      message: 'Debug de procesamiento completado con Sheet.best'
     });
     
   } catch (error) {

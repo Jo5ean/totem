@@ -1,10 +1,10 @@
 import express from 'express';
-import csvDownloadService from '../../services/csvDownloadService.js';
+import SheetBestService from '../../services/sheetBestService.js';
 import ActaExternaService from '../../services/actaExternaService.js';
 
 const router = express.Router();
 const actaService = new ActaExternaService();
-const csvService = new csvDownloadService();
+const sheetBestService = new SheetBestService();
 
 // GET /api/v1/dashboard/convergencia-inscripciones - Análisis de convergencia
 router.get('/convergencia-inscripciones', async (req, res) => {
@@ -102,40 +102,24 @@ router.get('/debug-convergencia', async (req, res) => {
   try {
     console.log('🔍 DEBUG: Iniciando debug de convergencia...');
     
-    const spreadsheetId = '12_tx2DXfebO-5SjRTiRTg3xebVR1x-5xJ_BFY7EPaS8';
-    const sheetName = 'convergencia';
+    console.log('🔍 DEBUG: Obteniendo datos desde Sheet.best...');
     
-    const resultadoCSV = await csvService.downloadCSV(spreadsheetId, sheetName);
-    const datosRaw = resultadoCSV.content;
+    const result = await sheetBestService.fetchAndProcessData();
+    const sampleData = result.data.slice(0, 3);
     
-    // Parsear CSV básico
-    const lineas = datosRaw.split('\n');
-    const headerLine = lineas[0];
-    const headers = parseCSVLine(headerLine);
-    
-    // Parsear primeras 3 filas de datos
-    const muestraDatos = [];
-    for (let i = 1; i <= Math.min(3, lineas.length - 1); i++) {
-      if (lineas[i].trim()) {
-        const valores = parseCSVLine(lineas[i]);
-        const fila = {};
-        headers.forEach((header, index) => {
-          fila[header.trim()] = valores[index]?.trim() || '';
-        });
-        muestraDatos.push(fila);
-      }
-    }
+    // Los datos ya están procesados por SheetBestService
+    const headers = sampleData.length > 0 ? Object.keys(sampleData[0]) : [];
     
     return res.json({
       success: true,
       debug: {
-        totalLineas: lineas.length,
+        source: 'sheet.best',
+        totalRows: result.metadata.totalRows,
+        validRows: result.metadata.validRows,
         headers: headers,
         cantidadHeaders: headers.length,
-        primerasFilas: muestraDatos,
-        headerOriginal: headerLine,
-        linea1Cruda: lineas[1],
-        linea1Parseada: lineas[1] ? parseCSVLine(lineas[1]) : null
+        primerasFilas: sampleData,
+        processedAt: result.metadata.processedAt
       }
     });
     
@@ -196,115 +180,35 @@ function parseCSVLine(line) {
  */
 async function leerDatosConvergencia() {
   try {
-    // Usar el mismo spreadsheet ID del sistema TOTEM
-    const spreadsheetId = '12_tx2DXfebO-5SjRTiRTg3xebVR1x-5xJ_BFY7EPaS8';
-    const sheetName = 'convergencia'; // Nombre de la hoja
+    console.log('📊 Obteniendo datos desde Sheet.best para convergencia...');
     
-    const resultadoCSV = await csvService.downloadCSV(spreadsheetId, sheetName);
-    const datosRaw = resultadoCSV.content;
+    const result = await sheetBestService.fetchAndProcessData();
     
-    if (!datosRaw || typeof datosRaw !== 'string') {
-      throw new Error('No se pudo obtener contenido válido del CSV');
-    }
+    // Usar los datos procesados directamente
+    const datos = result.data.filter(row => {
+      // Filtrar solo las filas que tengan datos de convergencia válidos
+      return row.MATERIA && row.AREATEMA && row.SECTOR;
+    });
     
-    // Procesar CSV y estructurar datos - PARSER MEJORADO
-    const lineas = datosRaw.split('\n');
+    console.log(`📖 Encontradas ${datos.length} materias válidas para convergencia`);
     
-    // Los headers del Google Sheet están vacíos, usamos estructura fija basada en datos observados
-    const headers = [
-      'SECTOR',       // Columna 0: ej. "2"
-      'CARRERA',      // Columna 1: ej. "133" 
-      'CODIGO',       // Columna 2: ej. "7"
-      'MATERIA',      // Columna 3: ej. "60", "710", "640"
-      'AREATEMA',     // Columna 4: ej. "710", "640"
-      'AÑO',          // Columna 5: ej. "2° AÑO"
-      'NOMBRE_CORTO', // Columna 6: ej. "DERECHO II"
-      'FECHA',        // Columna 7: ej. "4/7/2025"
-      'URL_CAMPUS',   // Columna 8: URL del campus virtual
-      'CLASE',        // Columna 9: Ej. "A", "B", "-"
-      'DOCENTE',      // Columna 10
-      'HORA',         // Columna 11: ej. "18:00"
-      'TIPO_EXAMEN',  // Columna 12: ej. "Oral en domicilio"
-      'CAMPO13',      // Columna 13
-      'COORDINADOR',  // Columna 14: ej. "ANDREA TEJERINA"
-      'CAMPO15',      // Columna 15
-      'CAMPO16',      // Columna 16
-      'OBSERVACIONES' // Columna 17
-    ];
-    
-    console.log(`📋 Usando headers fijos (${headers.length}): ${JSON.stringify(headers.slice(0, 8))}...`);
-    
-    const datos = [];
-    // Procesar desde línea 0 ya que no hay headers reales
-    for (let i = 0; i < lineas.length; i++) {
-      if (!lineas[i].trim()) continue; // Saltar líneas vacías
-      
-      const valores = parseCSVLine(lineas[i]);
-      
-      if (valores.length >= 5) { // Al menos sector, carrera, código, materia, areatema
-        const fila = {};
-        headers.forEach((header, index) => {
-          fila[header] = valores[index]?.trim() || '';
-        });
-        
-        // Extraer campos principales usando la estructura fija
-        const materiaId = fila.MATERIA || '';
-        const areaTema = fila.AREATEMA || '';
-        const sector = fila.SECTOR || '';
-        
-        // Debug: mostrar las primeras filas procesadas
-        if (datos.length < 3) {
-          console.log(`📋 Fila ${i} procesada:`, {
-            sector: sector,
-            carrera: fila.CARRERA,
-            materiaId: materiaId,
-            areaTema: areaTema,
-            nombreCorto: fila.NOMBRE_CORTO,
-            fecha: fila.FECHA,
-            valoresRaw: valores.slice(0, 8)
-          });
-        }
-        
-        // Solo incluir filas con MATERIA y AREATEMA válidos
-        if (materiaId && materiaId !== '' && materiaId !== 'null' && 
-            areaTema && areaTema !== '' && areaTema !== 'null') {
-          datos.push({
-            sector: sector,
-            carrera: fila.CARRERA,
-            codigo: fila.CODIGO,
-            materiaId: materiaId,
-            areaTema: areaTema,
-            año: fila.AÑO,
-            nombreCorto: fila.NOMBRE_CORTO,
-            fecha: fila.FECHA,
-            urlCampus: fila.URL_CAMPUS,
-            clase: fila.CLASE,
-            docente: fila.DOCENTE,
-            hora: fila.HORA,
-            tipoExamen: fila.TIPO_EXAMEN,
-            coordinador: fila.COORDINADOR
-          });
-        }
-      }
-    }
-    
-    console.log(`📖 Leídas ${datos.length} materias del sheet convergencia`);
-    
-    // Debug: mostrar algunas muestras
-    if (datos.length > 0) {
-      console.log(`📋 Primera materia procesada:`, JSON.stringify(datos[0], null, 2));
-      console.log(`📋 Muestra de IDs de materias:`, datos.slice(0, 5).map(d => d.materiaId));
-    } else {
-      console.log(`⚠️ No se procesaron materias. Revisando raw data...`);
-      console.log(`📋 Primeras 3 líneas raw:`, lineas.slice(0, 3));
-      console.log(`📋 Headers parseados:`, headers);
-      if (lineas.length > 1) {
-        const primeraLinea = parseCSVLine(lineas[1]);
-        console.log(`📋 Primera línea parseada:`, primeraLinea);
-      }
-    }
-    
-    return datos;
+    // Transformar al formato esperado por el resto del código
+    return datos.map(row => ({
+      sector: row.SECTOR,
+      carrera: row.CARRERA,
+      codigo: row.CODIGO || '',
+      materiaId: row.MATERIA,
+      areaTema: row.AREATEMA,
+      año: row.AÑO,
+      nombreCorto: row['NOMBRE CORTO'],
+      fecha: row.FECHA,
+      urlCampus: row.URL || '',
+      clase: row.CÁTEDRA || '',
+      docente: row.Docente,
+      hora: row.Hora,
+      tipoExamen: row['Tipo Examen'],
+      coordinador: row['Control a cargo de:']
+         }));
 
   } catch (error) {
     console.error('❌ Error leyendo datos de convergencia:', error);

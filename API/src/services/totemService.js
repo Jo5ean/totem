@@ -1,125 +1,96 @@
 import prisma from '../lib/db.js';
-import CSVDownloadService from './csvDownloadService.js';
+import SheetBestService from './sheetBestService.js';
 
 // ID del Google Sheet del TOTEM centralizado
 const TOTEM_SHEET_ID = '12_tx2DXfebO-5SjRTiRTg3xebVR1x-5xJ_BFY7EPaS8';
 
 class TotemService {
   constructor() {
-    this.csvService = new CSVDownloadService();
+    this.sheetBestService = new SheetBestService();
   }
 
   async syncTotemData() {
     const startTime = Date.now();
     
     try {
-      console.log('🚀 Iniciando sincronización TOTEM con detección automática...');
+      console.log('🚀 Iniciando sincronización TOTEM con Sheet.best API...');
       
-      // Detectar hojas disponibles dinámicamente
-      const sheetsToProcess = await this.csvService.getSheetNamesToProcess(
-        TOTEM_SHEET_ID,
-        // Fallback en caso de que la detección automática falle
-        [
-          '1° Turno Ordinario',
-          '2° Turno Ordinario', 
-          'Especial Abril',
-          'Extraordinario Mayo',
-          'Especial Junio'
-        ]
-      );
+      // Obtener datos directamente desde Sheet.best
+      const sheetResult = await this.sheetBestService.fetchAndProcessData();
       
-      console.log(`📋 Hojas a procesar: ${sheetsToProcess.length} - ${sheetsToProcess.join(', ')}`);
-      
-      const processedSheets = [];
-      let totalExamsCreated = 0;
-
-      for (const sheetName of sheetsToProcess) {
-        try {
-          console.log(`📋 Procesando hoja: ${sheetName}`);
-          
-          // Descargar y procesar CSV
-          const csvResult = await this.csvService.downloadAndParseCSV(
-            TOTEM_SHEET_ID, 
-            sheetName
-          );
-          
-          if (csvResult.parsedData && csvResult.parsedData.length > 0) {
-            // Guardar datos brutos en TotemData
-            const totemDataRecord = await this.saveRawTotemData(sheetName, csvResult.parsedData);
-            
-            // Procesar los datos y crear exámenes
-            const processedExams = await this.processTotemDataToExams(csvResult.parsedData, sheetName);
-            
-            totalExamsCreated += processedExams.length;
-            
-            processedSheets.push({
-              sheetName: sheetName,
-              totemDataId: totemDataRecord.id,
-              examensCreated: processedExams.length,
-              rowsProcessed: csvResult.parsedData.length,
-              csvFile: csvResult.fileName,
-              detectionMethod: 'automatic'
-            });
-            
-            console.log(`✅ ${sheetName}: ${processedExams.length} exámenes creados de ${csvResult.parsedData.length} filas`);
-          } else {
-            console.log(`⚠️ ${sheetName}: No hay datos para procesar`);
-            processedSheets.push({
-              sheetName: sheetName,
-              examensCreated: 0,
-              error: 'Sin datos válidos en el CSV'
-            });
-          }
-        } catch (error) {
-          console.error(`❌ Error procesando hoja ${sheetName}:`, error);
-          processedSheets.push({
-            sheetName: sheetName,
-            error: error.message,
-            examensCreated: 0
-          });
-        }
+      if (!sheetResult.success || !sheetResult.data || sheetResult.data.length === 0) {
+        throw new Error('No se obtuvieron datos válidos de Sheet.best');
       }
 
+      console.log(`📊 Datos obtenidos: ${sheetResult.data.length} filas válidas`);
+      
+      // Validar estructura de datos
+      const validation = this.sheetBestService.validateDataStructure(sheetResult.data);
+      if (!validation.isValid) {
+        console.warn(`⚠️ Validación: ${validation.issues.length} problemas encontrados`);
+        validation.issues.slice(0, 5).forEach(issue => {
+          console.warn(`  - Fila ${issue.row}: ${issue.message}`);
+        });
+      }
+
+      // Detectar tipos de exámenes y sectores
+      const detection = this.sheetBestService.detectExamTypes(sheetResult.data);
+      console.log(`🔍 Detectados: ${detection.totalUniqueSectors} sectores, ${detection.totalUniqueCareers} carreras`);
+
+      // Guardar datos brutos en TotemData
+      const totemDataRecord = await this.saveRawTotemData('sheet.best', sheetResult.data, sheetResult.metadata);
+      
+      // Procesar los datos y crear exámenes
+      const processedExams = await this.processTotemDataToExams(sheetResult.data);
+      
       const duration = Date.now() - startTime;
       
       console.log(`🎉 Sincronización TOTEM completada en ${duration}ms`);
-      console.log(`📊 Total: ${totalExamsCreated} exámenes creados de ${sheetsToProcess.length} hojas`);
+      console.log(`📊 Total: ${processedExams.length} exámenes creados de ${sheetResult.data.length} filas`);
       
       return {
         success: true,
         data: {
-          processedSheets,
-          totalExamsCreated,
-          totalSheets: sheetsToProcess.length,
-          successfulSheets: processedSheets.filter(s => !s.error).length,
-          detectedSheets: sheetsToProcess,
-          method: 'CSV_DOWNLOAD_AUTO_DETECT'
+          source: 'sheet.best',
+          totemDataId: totemDataRecord.id,
+          examensCreated: processedExams.length,
+          rowsProcessed: sheetResult.data.length,
+          validation: validation,
+          detection: detection,
+          metadata: sheetResult.metadata
         },
         duration,
         timestamp: new Date().toISOString()
       };
+
     } catch (error) {
       console.error('❌ Error en sincronización TOTEM:', error);
       throw error;
     }
   }
 
-  async saveRawTotemData(sheetName, sheetData) {
+  async saveRawTotemData(source, sheetData, metadata = {}) {
     return await prisma.totemData.create({
       data: {
-        sheetName,
-        data: sheetData,
+        sheetName: source,
+        data: {
+          rawData: sheetData,
+          metadata: metadata,
+          savedAt: new Date().toISOString()
+        },
         processed: false
       }
     });
   }
 
-  async processTotemDataToExams(sheetData, sheetName) {
+  async processTotemDataToExams(sheetData) {
     const createdExams = [];
+    
+    console.log(`🔄 Procesando ${sheetData.length} filas para crear exámenes...`);
     
     for (const row of sheetData) {
       try {
-        // Extraer datos del row del TOTEM
+        // Extraer datos del row (ya viene limpio de Sheet.best)
         const totemData = this.extractTotemRowData(row);
         
         if (!totemData.sector || !totemData.carrera || !totemData.materia || !totemData.fecha) {
@@ -162,6 +133,7 @@ class TotemService {
       }
     }
 
+    console.log(`✅ Procesamiento completado: ${createdExams.length} exámenes creados`);
     return createdExams;
   }
 
@@ -190,7 +162,7 @@ class TotemService {
     if (!dateString) return null;
     
     try {
-      // Formato DD/MM/YYYY del TOTEM
+      // Formato DD/MM/YYYY del TOTEM (ej: "30/6/2025")
       const parts = dateString.toString().split('/');
       if (parts.length === 3) {
         const [dia, mes, año] = parts;
@@ -198,96 +170,103 @@ class TotemService {
       }
       return null;
     } catch (error) {
-      console.error('Error parseando fecha:', dateString, error);
+      console.error('Error parseando fecha TOTEM:', dateString, error);
       return null;
     }
   }
 
   parseTotemTime(timeString) {
-    if (!timeString || timeString.trim() === '') return null;
+    if (!timeString) return null;
     
     try {
-      // Formato HH:MM del TOTEM
+      // Formato HH:MM del TOTEM (ej: "14:00")
       const parts = timeString.toString().split(':');
-      if (parts.length >= 2) {
-        const date = new Date();
-        date.setHours(parseInt(parts[0]), parseInt(parts[1]) || 0, 0, 0);
-        return date;
+      if (parts.length === 2) {
+        const [hours, minutes] = parts;
+        const time = new Date();
+        time.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        return time;
       }
       return null;
     } catch (error) {
-      console.error('Error parseando hora:', timeString, error);
+      console.error('Error parseando hora TOTEM:', timeString, error);
       return null;
     }
   }
 
   async mapSectorToFacultad(sector) {
-    const sectorFacultad = await prisma.sectorFacultad.findFirst({
-      where: { 
-        sector: sector,
-        activo: true 
-      },
-      include: { facultad: true }
-    });
-
-    return sectorFacultad?.facultad || null;
+    try {
+      const mapping = await prisma.sectorFacultad.findFirst({
+        where: { 
+          sector: sector.toString(),
+          activo: true 
+        },
+        include: { facultad: true }
+      });
+      
+      return mapping?.facultad || null;
+    } catch (error) {
+      console.error('Error mapeando sector:', error);
+      return null;
+    }
   }
 
   async mapCarreraTotem(carreraCodigoTotem, facultadId) {
-    // Buscar mapeo existente
-    let carreraTotem = await prisma.carreraTotem.findFirst({
-      where: { 
-        codigoTotem: carreraCodigoTotem,
-        activo: true 
-      },
-      include: { carrera: true }
-    });
+    try {
+      // Buscar mapeo existente
+      const mapping = await prisma.carreraTotem.findFirst({
+        where: { 
+          codigoTotem: carreraCodigoTotem.toString(),
+          esMapeada: true,
+          activo: true
+        },
+        include: { carrera: true }
+      });
 
-    // Si no existe, crear registro sin mapear
-    if (!carreraTotem) {
-      carreraTotem = await prisma.carreraTotem.create({
-        data: {
-          codigoTotem: carreraCodigoTotem,
+      if (mapping?.carrera) {
+        return mapping.carrera;
+      }
+
+      // Si no existe mapeo, crear registro de carrera no mapeada
+      await prisma.carreraTotem.upsert({
+        where: { codigoTotem: carreraCodigoTotem.toString() },
+        update: { nombreTotem: `Carrera TOTEM ${carreraCodigoTotem}` },
+        create: {
+          codigoTotem: carreraCodigoTotem.toString(),
           nombreTotem: `Carrera TOTEM ${carreraCodigoTotem}`,
-          esMapeada: false
+          esMapeada: false,
+          activo: true
         }
       });
-    }
 
-    return carreraTotem.carrera;
+      return null;
+    } catch (error) {
+      console.error('Error mapeando carrera TOTEM:', error);
+      return null;
+    }
   }
 
   async findOrCreateAula(totemData) {
-    // Por ahora, no creamos aulas automáticamente
-    // Esto se puede expandir según las necesidades
+    // Por ahora no crear aulas automáticamente
+    // Se puede implementar lógica específica según necesidades
     return null;
   }
 
   async createExamenFromTotem(totemData, carreraId, aulaId = null) {
-    // Verificar si ya existe un examen similar
-    const existingExamen = await prisma.examen.findFirst({
-      where: {
-        carreraId,
-        nombreMateria: totemData.nombreCorto || `Materia ${totemData.materia}`,
-        fecha: totemData.fecha
-      }
-    });
-
-    if (existingExamen) {
-      return existingExamen;
-    }
-
-    // Crear nuevo examen
     return await prisma.examen.create({
       data: {
         carreraId,
         aulaId,
-        nombreMateria: totemData.nombreCorto || `Materia ${totemData.materia}`,
+        nombreMateria: totemData.nombreCorto || totemData.materia || 'Sin nombre',
         fecha: totemData.fecha,
         hora: totemData.hora,
         tipoExamen: totemData.tipoExamen,
+        monitoreo: totemData.monitoreo,
         materialPermitido: totemData.materialPermitido,
-        observaciones: totemData.observaciones
+        observaciones: totemData.observaciones,
+        activo: true,
+        asignacionAuto: true,
+        modalidadExamen: totemData.tipoExamen?.includes('Virtual') ? 'virtual' : 'presencial'
       }
     });
   }
@@ -311,127 +290,64 @@ class TotemService {
     });
   }
 
-  // Métodos de configuración y mapeo
-
+  // Métodos de gestión de mapeos (sin cambios)
   async createSectorFacultadMapping(sector, facultadId) {
     return await prisma.sectorFacultad.create({
-      data: {
-        sector,
-        facultadId
-      }
+      data: { sector, facultadId, activo: true }
     });
   }
 
   async mapCarreraTotemToCarrera(codigoTotem, carreraId) {
-    return await prisma.carreraTotem.update({
+    return await prisma.carreraTotem.upsert({
       where: { codigoTotem },
-      data: {
-        carreraId,
-        esMapeada: true
-      }
+      update: { carreraId, esMapeada: true },
+      create: { codigoTotem, carreraId, esMapeada: true, nombreTotem: `Carrera ${codigoTotem}` }
     });
   }
 
   async getSectoresNoMapeados() {
-    try {
-      // Versión optimizada: usar agregación en lugar de cargar todos los registros
-      const result = await prisma.$queryRaw`
-        SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(data, '$[*].SECTOR')) as sector
-        FROM totem_data 
-        WHERE JSON_EXTRACT(data, '$[*].SECTOR') IS NOT NULL
-        LIMIT 1000
-      `;
-
-      const sectores = new Set();
-      
-      if (result && result.length > 0) {
-        result.forEach(row => {
-          if (row.sector) {
-            // El resultado puede venir como string separado por comas
-            const sectorValues = row.sector.split(',').map(s => s.trim().replace(/"/g, ''));
-            sectorValues.forEach(sector => {
-              if (sector && sector !== 'null') {
-                sectores.add(sector.toString());
-              }
-            });
-          }
-        });
-      }
-
-      // Si la consulta optimizada no funciona, usar método alternativo
-      if (sectores.size === 0) {
-        console.log('Usando método alternativo para obtener sectores...');
-        
-        // Obtener una muestra más pequeña sin ordenar
-        const totemData = await prisma.totemData.findMany({
-          take: 50, // Reducir significativamente la cantidad
-          select: {
-            data: true
-          }
-        });
-
-        totemData.forEach(record => {
-          if (Array.isArray(record.data)) {
-            record.data.forEach(row => {
-              if (row.SECTOR) {
-                sectores.add(row.SECTOR.toString());
-              }
-            });
-          }
-        });
-      }
-
-      const sectorArray = Array.from(sectores);
-      
-      if (sectorArray.length === 0) {
-        return [];
-      }
-
-      const mapeados = await prisma.sectorFacultad.findMany({
-        where: { sector: { in: sectorArray } }
-      });
-
-      const sectoresMapeados = new Set(mapeados.map(m => m.sector));
-      
-      return sectorArray.filter(sector => !sectoresMapeados.has(sector));
-    } catch (error) {
-      console.error('Error en getSectoresNoMapeados:', error);
-      // Retornar array vacío en caso de error
-      return [];
-    }
+    // Implementar lógica para detectar sectores desde Sheet.best que no están mapeados
+    const sheetResult = await this.sheetBestService.fetchAndProcessData();
+    const detection = this.sheetBestService.detectExamTypes(sheetResult.data);
+    
+    const sectoresEncontrados = detection.sectors;
+    const sectoresMapeados = await prisma.sectorFacultad.findMany({
+      where: { activo: true },
+      select: { sector: true }
+    });
+    
+    const sectoresMapeadosArray = sectoresMapeados.map(s => s.sector);
+    const sectoresNoMapeados = sectoresEncontrados.filter(s => !sectoresMapeadosArray.includes(s));
+    
+    return sectoresNoMapeados;
   }
 
   async getCarrerasTotemNoMapeadas() {
-    try {
-      return await prisma.carreraTotem.findMany({
-        where: { esMapeada: false },
-        take: 100, // Limitar la cantidad de resultados
-        select: {
-          id: true,
-          codigoTotem: true,
-          nombreTotem: true,
-          esMapeada: true,
-          carreraId: true
-        }
-        // Removemos el orderBy para evitar problemas de memoria
-      });
-    } catch (error) {
-      console.error('Error en getCarrerasTotemNoMapeadas:', error);
-      return [];
-    }
+    return await prisma.carreraTotem.findMany({
+      where: { 
+        esMapeada: false,
+        activo: true 
+      },
+      orderBy: { codigoTotem: 'asc' }
+    });
   }
 
   async getEstadisticasTotem() {
-    const [totalRegistros, examenes, sectoresNoMapeados, carrerasNoMapeadas] = await Promise.all([
+    const [
+      totalTotemData,
+      totalExamenes,
+      sectoresNoMapeados,
+      carrerasNoMapeadas
+    ] = await Promise.all([
       prisma.totemData.count(),
-      prisma.examenTotem.count(),
+      prisma.examen.count(),
       this.getSectoresNoMapeados(),
       this.getCarrerasTotemNoMapeadas()
     ]);
 
     return {
-      totalRegistrosTotem: totalRegistros,
-      totalExamenesCreados: examenes,
+      totalRegistrosTotem: totalTotemData,
+      totalExamenesCreados: totalExamenes,
       sectoresNoMapeados: sectoresNoMapeados.length,
       carrerasNoMapeadas: carrerasNoMapeadas.length,
       listaSectoresNoMapeados: sectoresNoMapeados,

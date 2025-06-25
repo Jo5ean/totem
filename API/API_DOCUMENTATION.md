@@ -1,416 +1,357 @@
-# 📚 API de TOTEM UCASAL
+# 📚 API de TOTEM UCASAL - Documentación Completa (v2.0)
 
-Esta es una API REST para gestionar cronogramas de exámenes de la Universidad Católica de Salta usando el sistema TOTEM centralizado.
+Esta es una API REST para gestionar cronogramas de exámenes de la Universidad Católica de Salta usando el sistema TOTEM centralizado con **Sheet.best API**.
 
-## 🏗️ Arquitectura
+## 🎯 Estado Actual (Junio 2025)
+
+**Sistema Migrado y Optimizado:**
+- ✅ Sheet.best API funcional (elimina errores 401)
+- ✅ 90% aprovechamiento de datos TOTEM (1,176/1,306 filas)
+- ✅ 31 carreras mapeadas automáticamente
+- ✅ 19 carreras nuevas creadas en BD
+- ⚠️ 7 carreras pendientes (130 filas sin procesar)
+
+## 🏗️ Arquitectura Funcional
 
 ```
-src/
-├── lib/                 # Configuraciones centrales
-│   └── db.js           # Conexión a base de datos
-├── services/           # Lógica de negocio
-│   ├── facultadService.js
-│   ├── totemService.js
-│   └── googleSheetsService.js
-├── controllers/        # Manejo de requests/responses
-│   └── facultadController.js
-├── middleware/         # Validaciones y middlewares
-│   └── validation.js
-└── pages/api/         # Endpoints REST
-    └── v1/
-        ├── facultades/
-        └── totem/
-            ├── mapeos/
-            │   ├── sectores.js
-            │   └── carreras.js
-            ├── sync.js
-            ├── estadisticas.js
-            └── index.js
+TOTEM API v2.0
+├── 🌐 Sheet.best Integration
+│   └── sheetBestService.js
+├── 🗺️ Mapeo Automático  
+│   ├── mapear-carreras-automatico.js
+│   └── crear-y-mapear-carreras.js
+├── 🔍 Análisis de Datos
+│   └── analizar-filas-descartadas.js
+├── ✅ Sincronización Simple
+│   └── simple-sync.js
+└── 🔧 Verificación BD
+    └── verify-database.js
 ```
 
-## 🔗 Endpoints Principales
+## 🚀 Endpoints Principales FUNCIONALES
 
-### **Facultades**
+### **🔄 Sincronización Completa**
 
-#### `GET /api/v1/facultades`
-Obtener todas las facultades con estadísticas.
+#### `POST /api/v1/totem/simple-sync`
+**ENDPOINT PRINCIPAL** - Sincronización completa de datos desde Sheet.best
 
+```bash
+curl -X POST "http://localhost:3001/api/v1/totem/simple-sync"
+```
+
+**Response Exitoso:**
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "id": 1,
-      "nombre": "FACULTAD DE ECONOMIA Y ADMINISTRACION",
-      "codigo": "ECON",
-      "carreras": [...],
-      "_count": {
-        "carreras": 14,
-        "syncLogs": 5
-      }
-    }
-  ],
-  "total": 7,
-  "timestamp": "2025-06-04T12:00:00.000Z"
-}
-```
-
-#### `POST /api/v1/facultades`
-Crear nueva facultad.
-
-```json
-{
-  "nombre": "Nueva Facultad",
-  "codigo": "NF",
-  "sheetId": "1ABC123..."
-}
-```
-
-#### `GET /api/v1/facultades/[id]`
-Obtener facultad específica por ID.
-
-### **TOTEM - Sistema Centralizado**
-
-#### `GET /api/v1/totem`
-Obtener datos brutos del TOTEM con paginación.
-
-**Query Parameters:**
-- `page`: Número de página (default: 1)
-- `limit`: Elementos por página (default: 10, max: 100)
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 10554,
-      "sheetName": "Especial Junio",
-      "data": {
-        "SECTOR": "21",
-        "CARRERA": "113",
-        "MATERIA": "2130",
-        "NOMBRE CORTO": "GES. REC.HUM(SEM OP)",
-        "FECHA": "10/6/2025",
-        "Hora": "14:00",
-        "Tipo Examen": "Escrito en sede",
-        "Docente": "VERONICA ALEJANDRA VARGAS"
-      },
-      "timestamp": "2025-06-05T14:14:37.851Z",
-      "processed": false
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 5,
-    "total": 10554,
-    "totalPages": 2111,
-    "hasNext": true,
-    "hasPrev": false
+  "message": "Sincronización TOTEM completada exitosamente",
+  "data": {
+    "totalFilas": 1314,
+    "filasValidas": 1306,
+    "examenesCreados": 1176,
+    "aprovechamiento": "90%",
+    "carrerasMapeadas": 31,
+    "tiempoEjecucion": "28.5s"
   }
 }
 ```
 
-#### `POST /api/v1/totem/sync`
-Sincronizar todos los datos del TOTEM centralizado.
+### **🗺️ Mapeos Automáticos**
+
+#### `POST /api/v1/totem/mapear-carreras-automatico`
+Mapea automáticamente carreras existentes en BD usando algoritmos de coincidencia.
 
 ```bash
-curl -X POST "http://localhost:3000/api/v1/totem/sync"
+curl -X POST "http://localhost:3001/api/v1/totem/mapear-carreras-automatico"
 ```
 
 **Response:**
 ```json
 {
   "success": true,
-  "message": "Sincronización TOTEM completada exitosamente",
+  "message": "Mapeo automático completado",
   "data": {
-    "processedSheets": [
+    "carrerasEncontradas": 12,
+    "nuevosMapeos": 7,
+    "examenesAdicionales": 211,
+    "detalles": [
       {
-        "sheetName": "Especial Junio",
-        "examensCreated": 150,
-        "rowsProcessed": 200
-      }
-    ],
-    "totalExamsCreated": 150,
-    "totalSheets": 5,
-    "successfulSheets": 5,
-    "duration": 15000
-  }
-}
-```
-
-#### `GET /api/v1/totem/estadisticas`
-Obtener estadísticas del sistema TOTEM.
-
-```json
-{
-  "success": true,
-  "data": {
-    "totalRegistrosTotem": 1500,
-    "totalExamenesCreados": 800,
-    "sectoresNoMapeados": 2,
-    "carrerasNoMapeadas": 15,
-    "listaSectoresNoMapeados": ["6", "7"],
-    "listaCarrerasNoMapeadas": [
-      {
-        "codigoTotem": "150",
-        "nombreTotem": "Carrera TOTEM 150",
-        "esMapeada": false
+        "codigoTotem": "88",
+        "carreraEncontrada": "Ingeniería Industrial",
+        "coincidencia": "exacta"
       }
     ]
   }
 }
 ```
 
-### **Mapeos de Sectores**
+#### `POST /api/v1/totem/crear-y-mapear-carreras`
+**ENDPOINT AVANZADO** - Crea carreras nuevas en BD y las mapea automáticamente.
 
-#### `GET /api/v1/totem/mapeos/sectores`
-Obtener mapeos de sectores a facultades.
+```bash
+curl -X POST "http://localhost:3001/api/v1/totem/crear-y-mapear-carreras"
+```
 
-**Query Parameters:**
-- `includeNoMapeados`: true/false - incluir sectores sin mapear
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Creación automática de carreras completada",
+  "data": {
+    "carrerasCreadas": 19,
+    "mapeos": 19,
+    "examenesAdicionales": 791,
+    "facultadesUsadas": {
+      "ECONOMÍA Y ADMINISTRACIÓN": 8,
+      "INGENIERÍA": 5,
+      "CIENCIAS JURÍDICAS": 3,
+      "ESCUELA DE EDUCACION": 3
+    }
+  }
+}
+```
+
+### **🔍 Análisis y Diagnóstico**
+
+#### `GET /api/v1/totem/analizar-filas-descartadas`
+Analiza qué filas del TOTEM no se están procesando y por qué.
+
+```bash
+curl -X GET "http://localhost:3001/api/v1/totem/analizar-filas-descartadas"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "totalFilasDescartadas": 130,
+    "motivosDescarte": {
+      "Carrera no mapeada": 130
+    },
+    "carrerasProblematicas": [
+      {
+        "codigoCarrera": "350",
+        "cantidadFilas": 39,
+        "problema": "Sin datos específicos (código genérico)",
+        "solucion": "Investigar con administración académica"
+      },
+      {
+        "codigoCarrera": "86", 
+        "cantidadFilas": 4,
+        "problema": "TURISMO - requiere crear facultad",
+        "solucion": "Crear Facultad de Turismo"
+      }
+    ]
+  }
+}
+```
+
+#### `GET /api/v1/totem/verify-database`
+Verificación completa del estado de la base de datos.
+
+```bash
+curl -X GET "http://localhost:3001/api/v1/totem/verify-database"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "examenes": {
+      "total": 1176,
+      "conAula": 0,
+      "sinAula": 1176,
+      "porcentajeConAula": "0%"
+    },
+    "carreras": {
+      "totalBD": 50,
+      "mapeadas": 31,
+      "noMapeadas": 19,
+      "porcentajeMapeado": "62%"
+    },
+    "tiposExamen": {
+      "Escrito en sede": 1098,
+      "ORAL": 78
+    }
+  }
+}
+```
+
+### **📊 Estadísticas del Sistema**
+
+#### `GET /api/v1/totem/estadisticas`
+Estadísticas completas del aprovechamiento de datos TOTEM.
 
 ```json
 {
   "success": true,
   "data": {
-    "mapeos": [
-      {
-        "id": 1,
-        "sector": "2",
-        "facultadId": 1,
-        "activo": true,
-        "facultad": {
-          "id": 1,
-          "nombre": "FACULTAD DE ECONOMIA Y ADMINISTRACION"
-        }
-      }
-    ],
-    "sectoresNoMapeados": ["6", "7"]
+    "rendimiento": {
+      "totalRegistrosTotem": 1314,
+      "registrosValidos": 1306,
+      "examenesCreados": 1176,
+      "aprovechamiento": "90%"
+    },
+    "carreras": {
+      "mapeadas": 31,
+      "pendientes": 7,
+      "nuevasCreadas": 19
+    },
+    "carrerasProblematicas": [
+      "350", "355", "361", "378", "58", "86", "383"
+    ]
   }
 }
 ```
 
-#### `POST /api/v1/totem/mapeos/sectores`
-Crear mapeo sector → facultad.
+## 🗄️ Estructura de Base de Datos
 
-```json
-{
-  "sector": "5",
-  "facultadId": 1
-}
-```
+### **Tablas Principales**
 
-#### `PUT /api/v1/totem/mapeos/sectores?id=1`
-Actualizar mapeo de sector.
-
-```json
-{
-  "facultadId": 2,
-  "activo": true
-}
-```
-
-#### `DELETE /api/v1/totem/mapeos/sectores?id=1`
-Eliminar mapeo de sector.
-
-### **Mapeos de Carreras**
-
-#### `GET /api/v1/totem/mapeos/carreras`
-Obtener mapeos de carreras del TOTEM.
-
-**Query Parameters:**
-- `soloNoMapeadas`: true/false - solo carreras sin mapear
-
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": 1,
-      "codigoTotem": "113",
-      "carreraId": 5,
-      "nombreTotem": "Carrera TOTEM 113",
-      "esMapeada": true,
-      "carrera": {
-        "id": 5,
-        "nombre": "Licenciatura en Educación",
-        "facultad": {
-          "nombre": "ESCUELA DE EDUCACION"
-        }
-      }
-    }
-  ]
-}
-```
-
-#### `POST /api/v1/totem/mapeos/carreras`
-Mapear carrera TOTEM → carrera local.
-
-```json
-{
-  "codigoTotem": "113",
-  "carreraId": 5
-}
-```
-
-#### `PUT /api/v1/totem/mapeos/carreras?codigoTotem=113`
-Actualizar mapeo de carrera.
-
-```json
-{
-  "carreraId": 6,
-  "nombreTotem": "Nuevo nombre",
-  "activo": true
-}
-```
-
-## 🔧 Códigos de Estado
-
-- `200` - OK
-- `201` - Creado
-- `400` - Error de validación
-- `404` - No encontrado
-- `405` - Método no permitido
-- `500` - Error interno del servidor
-
-## 🛡️ Validaciones
-
-### Paginación
-- `page`: Entero mayor a 0
-- `limit`: Entero entre 1 y 100
-
-### IDs
-- Deben ser números enteros válidos
-- `facultadId` debe existir en la base de datos
-- `carreraId` debe existir en la base de datos
-
-### Sectores
-- `sector`: String requerido, código único del TOTEM
-
-### Códigos TOTEM
-- `codigoTotem`: String requerido, código único de carrera en TOTEM
-
-## 🚀 Ejemplos de Uso
-
-### Flujo Completo de Configuración
-
-```bash
-# 1. Obtener facultades disponibles
-curl -X GET "http://localhost:3000/api/v1/facultades"
-
-# 2. Crear mapeos de sectores
-curl -X POST "http://localhost:3000/api/v1/totem/mapeos/sectores" \
-  -H "Content-Type: application/json" \
-  -d '{"sector": "2", "facultadId": 1}'
-
-# 3. Sincronizar datos del TOTEM
-curl -X POST "http://localhost:3000/api/v1/totem/sync"
-
-# 4. Ver estadísticas
-curl -X GET "http://localhost:3000/api/v1/totem/estadisticas"
-
-# 5. Ver sectores no mapeados
-curl -X GET "http://localhost:3000/api/v1/totem/mapeos/sectores?includeNoMapeados=true"
-
-# 6. Ver carreras no mapeadas
-curl -X GET "http://localhost:3000/api/v1/totem/mapeos/carreras?soloNoMapeadas=true"
-
-# 7. Mapear carreras faltantes
-curl -X POST "http://localhost:3000/api/v1/totem/mapeos/carreras" \
-  -H "Content-Type: application/json" \
-  -d '{"codigoTotem": "113", "carreraId": 5}'
-```
-
-### Consultar datos TOTEM
-
-```bash
-# Obtener datos brutos del TOTEM
-curl -X GET "http://localhost:3000/api/v1/totem?page=1&limit=10"
-
-# Obtener estadísticas completas
-curl -X GET "http://localhost:3000/api/v1/totem/estadisticas"
-```
-
-## 📊 Estructura de Datos
-
-### Google Sheet TOTEM
-**URL**: [Finales Convergencia 2025](https://docs.google.com/spreadsheets/d/12_tx2DXfebO-5SjRTiRTg3xebVR1x-5xJ_BFY7EPaS8/edit?gid=848244318#gid=848244318)
-
-| Campo | Descripción | Ejemplo |
-|-------|-------------|---------|
-| SECTOR | Identificador de facultad | 2, 3, 4, 21 |
-| CARRERA | Código de carrera | 9, 15, 88, 113 |
-| MATERIA | Código de materia | 130, 260, 1000 |
-| NOMBRE CORTO | Nombre de la materia | "PORTUGUES I" |
-| FECHA | Fecha del examen | "2/6/2025" |
-| Hora | Hora del examen | "14:00" |
-| Tipo Examen | Modalidad | "ORAL", "Escrito en sede" |
-| Docente | Nombre del docente | "DENISE FERRAO SANTANNA" |
-
-### Base de Datos
-
-#### TotemData
-```typescript
-{
-  id: number
-  sheetName: string
-  data: object[]
-  timestamp: Date
+#### `totem_data`
+Datos brutos obtenidos de Sheet.best API.
+```sql
+totem_data (
+  id: 10554 registros,
+  sheetName: string,
+  data: JSON,
+  timestamp: datetime,
   processed: boolean
-}
+)
 ```
 
-#### SectorFacultad
-```typescript
-{
-  id: number
-  sector: string
-  facultadId: number
+#### `carrera_totem` 
+Mapeos entre códigos TOTEM y carreras locales.
+```sql
+carrera_totem (
+  id: int,
+  codigoTotem: string (ej: "113", "88"),
+  carreraId: int,
+  nombreTotem: string,
+  esMapeada: boolean,
   activo: boolean
-  facultad: Facultad
-}
+)
 ```
 
-#### CarreraTotem
-```typescript
-{
-  id: number
-  codigoTotem: string
-  carreraId?: number
-  nombreTotem: string
-  esMapeada: boolean
-  activo: boolean
-  carrera?: Carrera
-}
+#### `examenes`
+Exámenes procesados del TOTEM.
+```sql
+examenes (
+  id: 1176 exámenes,
+  materiaId: int,
+  fecha: date,
+  hora: time,
+  tipoExamen: enum,
+  docenteNombre: string,
+  aulaId: int (NULL para todos actualmente)
+)
 ```
 
-#### ExamenTotem
-```typescript
-{
-  id: number
-  examenId: number
-  sectorTotem: string
-  carreraTotem: string
-  materiaTotem: string
-  docenteTotem: string
-  dataOriginal: object
-  examen: Examen
-}
+## 📁 Archivos de Datos Incluidos
+
+### **CSVs de Referencia (CRÍTICOS)**
+```
+Codcar_y_Carrera.csv      - Mapeo códigos → nombres carreras
+sectores_202506061224.csv - Mapeo sectores → facultades  
+consultacarreras.json     - Data estructurada de carreras
 ```
 
-## 🔄 Migración desde Sistema Anterior
+### **Histórico de Descargas**
+```
+csv_downloads/ - 100+ archivos CSV históricos del TOTEM
+```
 
-El nuevo sistema TOTEM centralizado reemplaza el sistema anterior de sincronización por facultades individuales. 
+## 🚨 Carreras Pendientes de Mapear
 
-**Ventajas:**
-- ✅ Sincronización única para todas las facultades
-- ✅ Datos unificados y consistentes
-- ✅ Mapeos configurables via API
-- ✅ Trazabilidad completa de datos originales
-- ✅ Menor mantenimiento y configuración
+### **Códigos Problemáticos Identificados (130 filas)**
 
-Para migrar del sistema anterior:
-1. Ejecutar `node scripts/setup-totem-mapeos.js`
-2. Configurar mapeos via API
-3. Realizar primera sincronización
-4. Los endpoints antiguos de cronogramas han sido removidos 
+| Código | Filas | Problema | Solución Sugerida |
+|--------|-------|----------|-------------------|
+| **350** | 39 | Sin datos específicos | Investigar con administración |
+| **355** | 31 | Sin datos específicos | Investigar con administración |
+| **361** | 25 | Sin datos específicos | Investigar con administración |
+| **378** | 19 | Sin datos específicos | Investigar con administración |
+| **58**  | 8  | No existe en CSV | Buscar información faltante |
+| **86**  | 4  | TURISMO | Crear Facultad de Turismo |
+| **383** | 4  | MINERÍA | Crear Facultad de Minería |
+
+### **Próximos Pasos para 95-98% Aprovechamiento**
+1. ✅ Crear Facultad de Turismo (código 86)
+2. ✅ Crear Facultad de Minería (código 383)  
+3. 🔍 Investigar códigos genéricos (350, 355, 361, 378)
+4. 📝 Buscar información sobre código 58
+
+## 🔧 Scripts de Configuración
+
+```bash
+# Mapeo automático inicial (YA EJECUTADO)
+node scripts/mapear-carreras-automatico.js
+
+# Configuración de aulas (PENDIENTE - 0% asignadas)
+node scripts/configurar-aulas-iniciales.js
+node scripts/configurar-aulas-uam.js
+```
+
+## 🌍 Configuración de Entorno
+
+```env
+# Base de datos MySQL
+DATABASE_URL="mysql://root:Chuvaca6013.@localhost:3306/ucasal_cronogramas"
+
+# Servidor
+NODE_ENV="development"
+PORT=3001
+
+# Sheet.best API (NO requiere autenticación)
+# URL: https://api.sheetbest.com/sheets/16ccd035-8c9e-4218-b5f1-2da9939d7b3d
+```
+
+## 📈 Métricas de Rendimiento Actual
+
+### **Mejoras Logradas**
+- **Exámenes procesados**: 174 → 1,176 (+576%)
+- **Aprovechamiento**: 13.3% → 90% 
+- **Carreras mapeadas**: 5 → 31 (+520%)
+- **Errores HTTP 401**: Eliminados completamente
+- **Tiempo de sincronización**: <30 segundos
+
+### **Estado de Asignación de Aulas**
+- **Con aula asignada**: 0 exámenes (0%)
+- **Sin aula asignada**: 1,176 exámenes (100%)
+- **Configuración pendiente**: Scripts de aulas disponibles
+
+## 🔄 Migración Completada vs Sistema Anterior
+
+### ❌ **Removido (Obsoleto)**
+- Google Sheets CSV directo
+- `csvDownloadService.js` 
+- Endpoints con errores 401
+- `cronogramaService.js`
+
+### ✅ **Implementado (Funcional)**
+- Sheet.best API integration
+- `sheetBestService.js`
+- Mapeo automático de carreras
+- Creación automática de carreras
+- Análisis de datos sin procesar
+- Verificación completa de BD
+
+## 🎯 Roadmap Sugerido
+
+### **Corto Plazo (Esta Semana)**
+1. Resolver 7 carreras pendientes
+2. Configurar asignación de aulas
+3. Implementar otras 2 entradas mencionadas
+
+### **Mediano Plazo (Próximo Mes)**  
+4. Sistema de consulta de inscriptos
+5. Asignación manual de aulas por admin
+6. Backoffice UI mejorado
+
+### **Largo Plazo (Próximos Meses)**
+7. Notificaciones automáticas
+8. Exportación de reportes
+9. Integración con otros sistemas UCASAL
+
+**El sistema está operativo al 90% y listo para producción.** 

@@ -12,39 +12,40 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('🔍 Detectando datos disponibles desde Sheet.best...');
+    console.log('🧪 Probando Sheet.best API...');
     
     const startTime = Date.now();
     
-    // Obtener y procesar datos desde Sheet.best
+    // Obtener datos usando Sheet.best
     const result = await sheetBestService.fetchAndProcessData();
-    
-    // Detectar tipos de exámenes y otros metadatos
-    const analysis = sheetBestService.detectExamTypes(result.data);
     
     const duration = Date.now() - startTime;
     
     return res.status(200).json({
       success: true,
+      test: 'Sheet.best API Test',
+      timestamp: new Date().toISOString(),
       data: {
+        source: 'sheet.best',
         totalRows: result.metadata.totalRows,
         validRows: result.metadata.validRows,
-        examTypes: analysis.examTypes,
-        sectors: analysis.sectors,
-        careers: analysis.careers,
-        source: 'sheet.best',
-        processedAt: result.metadata.processedAt,
-        detectionTime: `${duration}ms`
+        sampleData: result.data.slice(0, 3),
+        headers: result.data.length > 0 ? Object.keys(result.data[0]) : [],
+        performance: {
+          duration: `${duration}ms`,
+          rowsPerSecond: Math.round(result.metadata.validRows / (duration / 1000))
+        }
       },
-      message: `Detección completada: ${result.metadata.validRows} filas válidas encontradas desde Sheet.best`
+      message: `Sheet.best API funcionando correctamente: ${result.metadata.validRows} filas válidas procesadas en ${duration}ms`
     });
     
   } catch (error) {
-    console.error('❌ Error en detección de datos:', error);
+    console.error('❌ Error probando Sheet.best:', error);
     return res.status(500).json({
       success: false,
-      error: 'Error detectando datos desde Sheet.best',
-      message: error.message
+      error: 'Error probando Sheet.best API',
+      message: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 } 
