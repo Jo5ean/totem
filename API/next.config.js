@@ -11,7 +11,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: 'http://localhost:3001', // Permitir requests desde el backoffice
+            value: '*', // Permitir todos los orígenes en desarrollo
           },
           {
             key: 'Access-Control-Allow-Methods',

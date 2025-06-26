@@ -163,68 +163,102 @@ import ExamModal from '../../components/ExamModal.astro';
         // Validación del DNI
         function validateDNI(dni: string): boolean {
             const dniRegex = /^[0-9]{7,8}$/;
-            return dniRegex.test(dni);
+            const isValid = dniRegex.test(dni) && dni.length >= 7 && dni.length <= 8;
+            console.log(`Validando DNI: "${dni}" - Válido: ${isValid}`);
+            return isValid;
         }
         
-        // Simular búsqueda de examen con múltiples exámenes
-        function searchExam(dni: string): Promise<{found: boolean; examData?: any}> {
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    console.log('Buscando examen para DNI:', dni);
-                    
-                    // Simulamos diferentes escenarios
-                    const scenarios = [
-                        // Caso 1: Un solo examen
-                        {
-                            found: true,
-                            examData: {
-                                dni: dni,
-                                estudiante: { nombre: "María González", carrera: "Lic. en Administración" },
-                                examenes: [
-                                    {
-                                        materia: "SISTEMAS ADM. CONTABLES",
-                                        fecha: "Hoy - 5 Jun",
-                                        hora: "14:00",
-                                        aula: "Aula 203",
-                                        tipo: "Escrito",
-                                        profesor: "JOSE A. LAMAS"
-                                    }
-                                ]
-                            }
-                        },
-                        // Caso 2: Múltiples exámenes
-                        {
-                            found: true,
-                            examData: {
-                                dni: dni,
-                                estudiante: { nombre: "Carlos Mendoza", carrera: "Lic. en Economía" },
-                                examenes: [
-                                    {
-                                        materia: "MICROECONOMÍA AVANZADA",
-                                        fecha: "Hoy - 5 Jun",
-                                        hora: "14:00",
-                                        aula: "Aula 101",
-                                        tipo: "Escrito",
-                                        profesor: "NICOLAS LIENDRO"
-                                    },
-                                    {
-                                        materia: "ESTADÍSTICA APLICADA",
-                                        fecha: "Mañana - 6 Jun",
-                                        hora: "16:00",
-                                        aula: "Aula 205",
-                                        tipo: "Oral",
-                                        profesor: "ROBERTO CADAR"
-                                    }
-                                ]
-                            }
-                        }
-                    ];
-                    
-                    // Alternamos entre escenarios para testing
-                    const scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
-                    resolve(scenario);
-                }, 1500);
-            });
+        // Búsqueda real de exámenes usando la API
+        async function searchExam(dni: string): Promise<{found: boolean; examData?: any}> {
+            try {
+                console.log('Consultando exámenes para DNI:', dni);
+                
+                // Llamar a nuestro endpoint
+                const response = await fetch(`http://localhost:3000/api/v1/estudiantes/examenes/${dni}`);
+                
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        return { found: false };
+                    }
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+                
+                const apiResult = await response.json();
+                
+                if (!apiResult.success || !apiResult.data.examenes || apiResult.data.examenes.length === 0) {
+                    return { found: false };
+                }
+                
+                // Transformar datos de la API al formato esperado por el modal
+                const examData = {
+                    dni: apiResult.data.estudiante.dni,
+                    estudiante: {
+                        nombre: apiResult.data.estudiante.nombre,
+                        carrera: apiResult.data.examenes[0]?.carrera?.nombre || 'No especificada',
+                        lugar: apiResult.data.estudiante.lugar,
+                        sector: apiResult.data.estudiante.sector
+                    },
+                    examenes: apiResult.data.examenes.map((examen: any) => ({
+                        materia: examen.materia?.nombre || examen.materia?.nombreCorto || 'Materia no especificada',
+                        fecha: formatearFecha(examen.fecha || examen.fechaExterna),
+                        hora: examen.hora || 'Hora no especificada',
+                        aula: examen.aula?.nombre || 'Sin asignar',
+                        ubicacion: examen.aula?.ubicacion || '',
+                        tipo: examen.tipoExamen || 'No especificado',
+                        modalidad: examen.modalidad || 'presencial',
+                        profesor: examen.docente || 'No especificado',
+                        observaciones: examen.observaciones || '',
+                        materialPermitido: examen.materialPermitido || '',
+                        requierePc: examen.requierePc || false,
+                        carrera: examen.carrera?.nombre || 'No especificada',
+                        facultad: examen.carrera?.facultad || 'No especificada'
+                    }))
+                };
+                
+                console.log('Exámenes procesados:', examData);
+                
+                return {
+                    found: true,
+                    examData: examData
+                };
+                
+            } catch (error) {
+                console.error('Error al consultar API:', error);
+                throw error;
+            }
+        }
+        
+        // Función auxiliar para formatear fechas
+        function formatearFecha(fecha: string | null): string {
+            if (!fecha) return 'Fecha no especificada';
+            
+            try {
+                const fechaObj = new Date(fecha);
+                const hoy = new Date();
+                const manana = new Date(hoy);
+                manana.setDate(hoy.getDate() + 1);
+                
+                const fechaStr = fechaObj.toISOString().split('T')[0];
+                const hoyStr = hoy.toISOString().split('T')[0];
+                const mananaStr = manana.toISOString().split('T')[0];
+                
+                if (fechaStr === hoyStr) {
+                    return `Hoy - ${fechaObj.getDate()} ${obtenerNombreMes(fechaObj.getMonth())}`;
+                } else if (fechaStr === mananaStr) {
+                    return `Mañana - ${fechaObj.getDate()} ${obtenerNombreMes(fechaObj.getMonth())}`;
+                } else {
+                    return `${fechaObj.getDate()} ${obtenerNombreMes(fechaObj.getMonth())} ${fechaObj.getFullYear()}`;
+                }
+            } catch (error) {
+                return fecha;
+            }
+        }
+        
+        // Función auxiliar para obtener nombre del mes
+        function obtenerNombreMes(mes: number): string {
+            const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 
+                          'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            return meses[mes] || '';
         }
         
         // Event listener para el input DNI (solo números)
@@ -242,17 +276,21 @@ import ExamModal from '../../components/ExamModal.astro';
             e.preventDefault();
             
             const dni = dniInput?.value.trim() || '';
+            console.log('DNI ingresado:', dni, 'Longitud:', dni.length);
             
             if (!dni) {
+                console.log('DNI vacío');
                 showError();
                 return;
             }
             
             if (!validateDNI(dni)) {
+                console.log('DNI no válido según regex:', dni);
                 showError();
                 return;
             }
             
+            console.log('DNI válido, iniciando búsqueda...');
             hideMessages();
             showLoading();
             
