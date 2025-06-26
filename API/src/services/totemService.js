@@ -88,6 +88,36 @@ class TotemService {
     
     console.log(`🔄 Procesando ${sheetData.length} filas para crear exámenes...`);
     
+    // OPTIMIZACIÓN: Cargar todos los ExamenesTotem existentes en memoria (cache)
+    console.log('📋 Cargando cache de exámenes existentes...');
+    const existingExamesTotem = await prisma.examenTotem.findMany({
+      select: {
+        sectorTotem: true,
+        carreraTotem: true,
+        materiaTotem: true,
+        examenId: true,
+        examen: {
+          select: {
+            id: true,
+            carreraId: true,
+            fecha: true,
+            activo: true
+          }
+        }
+      }
+    });
+    
+    // Crear un Map para búsqueda O(1)
+    const examnesCache = new Map();
+    existingExamesTotem.forEach(et => {
+      if (et.examen) {
+        const key = `${et.sectorTotem}_${et.carreraTotem}_${et.materiaTotem}_${et.examen.carreraId}_${et.examen.fecha.toDateString()}`;
+        examnesCache.set(key, et.examen);
+      }
+    });
+    
+    console.log(`📋 Cache cargado: ${examnesCache.size} exámenes en memoria`);
+    
     for (const row of sheetData) {
       try {
         // Extraer datos del row (ya viene limpio de Sheet.best)
@@ -120,11 +150,23 @@ class TotemService {
         // 3. Buscar o crear aula si hay información
         const aula = await this.findOrCreateAula(totemData);
 
-        // 4. Crear examen
+        // 4. VERIFICAR DUPLICADOS usando cache (SÚPER RÁPIDO)
+        const cacheKey = `${totemData.sector}_${totemData.carrera}_${totemData.materia}_${carrera.id}_${totemData.fecha.toDateString()}`;
+        const existeExamen = examnesCache.get(cacheKey);
+        if (existeExamen) {
+          console.log(`⚠️  Examen ya existe: ${totemData.sector}/${totemData.carrera}/${totemData.materia} (${totemData.fecha.toDateString()}) - ID: ${existeExamen.id}`);
+          continue; // Skip creating duplicate
+        }
+
+        // 5. Crear examen
         const examen = await this.createExamenFromTotem(totemData, carrera.id, aula?.id);
         
-        // 5. Crear registro de ExamenTotem con datos originales
+        // 6. Crear registro de ExamenTotem con datos originales
         await this.createExamenTotemRecord(examen.id, totemData, row);
+
+        // 7. AGREGAR AL CACHE para futuras verificaciones en esta ejecución
+        const newCacheKey = `${totemData.sector}_${totemData.carrera}_${totemData.materia}_${carrera.id}_${totemData.fecha.toDateString()}`;
+        examnesCache.set(newCacheKey, examen);
 
         createdExams.push(examen);
 
@@ -353,6 +395,45 @@ class TotemService {
       listaSectoresNoMapeados: sectoresNoMapeados,
       listaCarrerasNoMapeadas: carrerasNoMapeadas
     };
+  }
+
+  /**
+   * Verifica si ya existe un examen con los mismos datos clave (OPTIMIZADO)
+   * Campos clave: sector + carrera + materia + fecha
+   */
+  async checkExamenDuplicate(totemData, carreraId) {
+    try {
+      // Búsqueda optimizada: solo en ExamenTotem con índice en los campos clave
+      const existingExamenTotem = await prisma.examenTotem.findFirst({
+        where: {
+          sectorTotem: totemData.sector,
+          carreraTotem: totemData.carrera,
+          materiaTotem: totemData.materia
+        },
+        select: {
+          examenId: true
+        }
+      });
+
+      // Si existe, verificar que el examen asociado coincida con fecha y carrera
+      if (existingExamenTotem) {
+        const examen = await prisma.examen.findFirst({
+          where: {
+            id: existingExamenTotem.examenId,
+            carreraId: carreraId,
+            fecha: totemData.fecha,
+            activo: true
+          }
+        });
+        
+        return examen;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error verificando duplicado de examen:', error);
+      return null;
+    }
   }
 }
 

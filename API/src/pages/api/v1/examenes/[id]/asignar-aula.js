@@ -1,18 +1,17 @@
 import prisma from '../../../../../lib/db.js';
 
 export default async function handler(req, res) {
-  if (req.method !== 'PUT') {
+  if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
-      error: `Método ${req.method} no permitido`,
-      allowedMethods: ['PUT']
+      error: 'Método no permitido. Usa POST.'
     });
   }
 
   const { id } = req.query;
-  const { aulaId } = req.body;
+  const { aulaId, observaciones } = req.body;
 
-  // Validaciones
+  // Validar parámetros
   if (!id || isNaN(parseInt(id))) {
     return res.status(400).json({
       success: false,
@@ -28,18 +27,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const examenId = parseInt(id);
-    const aulaIdNum = parseInt(aulaId);
-
-    // Verificar que el examen existe
+    // 1. Verificar que el examen existe
     const examen = await prisma.examen.findUnique({
-      where: { id: examenId },
+      where: { id: parseInt(id) },
       include: {
-        materia: true,
-        carrera: true,
-        _count: {
-          select: { actasExamen: true }
-        }
+        carrera: {
+          include: { facultad: true }
+        },
+        aula: true
       }
     });
 
@@ -50,9 +45,9 @@ export default async function handler(req, res) {
       });
     }
 
-    // Verificar que el aula existe y está disponible
+    // 2. Verificar que el aula existe y está disponible
     const aula = await prisma.aula.findUnique({
-      where: { id: aulaIdNum }
+      where: { id: parseInt(aulaId) }
     });
 
     if (!aula) {
@@ -63,22 +58,21 @@ export default async function handler(req, res) {
     }
 
     if (!aula.disponible) {
-      return res.status(409).json({
+      return res.status(400).json({
         success: false,
-        error: 'El aula no está disponible'
+        error: 'El aula seleccionada no está disponible'
       });
     }
 
-    // Verificar conflictos de horario (misma fecha y hora)
+    // 3. Verificar conflictos de horario (opcional, pero recomendado)
     const conflictos = await prisma.examen.findMany({
       where: {
-        aulaId: aulaIdNum,
+        aulaId: parseInt(aulaId),
         fecha: examen.fecha,
         hora: examen.hora,
-        id: { not: examenId } // Excluir el examen actual
+        id: { not: parseInt(id) } // Excluir el examen actual
       },
       include: {
-        materia: true,
         carrera: true
       }
     });
@@ -86,72 +80,82 @@ export default async function handler(req, res) {
     if (conflictos.length > 0) {
       return res.status(409).json({
         success: false,
-        error: 'Conflicto de horario: el aula ya está ocupada en esa fecha y hora',
-        conflictos: conflictos.map(c => ({
-          id: c.id,
-          materia: c.materia.nombre,
-          carrera: c.carrera.nombre,
-          fecha: c.fecha.toISOString().split('T')[0],
-          hora: c.hora
-        }))
-      });
-    }
-
-    // Verificar capacidad del aula vs cantidad de estudiantes inscriptos
-    const cantidadEstudiantes = examen._count.actasExamen;
-    if (aula.capacidad && cantidadEstudiantes > aula.capacidad) {
-      return res.status(409).json({
-        success: false,
-        error: `El aula tiene capacidad para ${aula.capacidad} estudiantes, pero hay ${cantidadEstudiantes} inscriptos`,
-        capacidadAula: aula.capacidad,
-        estudiantesInscriptos: cantidadEstudiantes
-      });
-    }
-
-    // Asignar el aula al examen
-    const examenActualizado = await prisma.examen.update({
-      where: { id: examenId },
-      data: { aulaId: aulaIdNum },
-      include: {
-        materia: true,
-        carrera: true,
-        facultad: true,
-        aula: true,
-        _count: {
-          select: { actasExamen: true }
+        error: 'Conflicto de horario detectado',
+        data: {
+          conflictos: conflictos.map(c => ({
+            id: c.id,
+            materia: c.nombreMateria,
+            carrera: c.carrera.nombre,
+            fecha: c.fecha?.toISOString().split('T')[0],
+            hora: c.hora?.toTimeString().split(' ')[0]
+          }))
         }
+      });
+    }
+
+    // 4. Asignar el aula al examen
+    const examenActualizado = await prisma.examen.update({
+      where: { id: parseInt(id) },
+      data: {
+        aulaId: parseInt(aulaId),
+        observaciones: observaciones || examen.observaciones,
+        updatedAt: new Date()
+      },
+      include: {
+        carrera: {
+          include: { facultad: true }
+        },
+        aula: true
       }
     });
 
+    console.log(`✅ Aula asignada: Examen ${id} → Aula ${aula.nombre}`);
+
     return res.status(200).json({
       success: true,
-      data: examenActualizado,
-      message: `Aula ${aula.nombre} asignada exitosamente al examen de ${examenActualizado.materia.nombre}`,
-      resumen: {
+      message: `Aula "${aula.nombre}" asignada exitosamente`,
+      data: {
         examen: {
-          materia: examenActualizado.materia.nombre,
-          carrera: examenActualizado.carrera.nombre,
-          fecha: examenActualizado.fecha.toISOString().split('T')[0],
-          hora: examenActualizado.hora
+          id: examenActualizado.id,
+          nombre: examenActualizado.nombreMateria,
+          fecha: examenActualizado.fecha?.toISOString().split('T')[0],
+          hora: examenActualizado.hora?.toTimeString().split(' ')[0],
+          carrera: {
+            nombre: examenActualizado.carrera.nombre,
+            facultad: examenActualizado.carrera.facultad.nombre
+          },
+          aula: {
+            id: examenActualizado.aula.id,
+            nombre: examenActualizado.aula.nombre,
+            capacidad: examenActualizado.aula.capacidad,
+            ubicacion: examenActualizado.aula.ubicacion
+          },
+          observaciones: examenActualizado.observaciones
         },
-        aula: {
-          nombre: aula.nombre,
-          ubicacion: aula.ubicacion,
-          capacidad: aula.capacidad
-        },
-        estudiantes: {
-          inscriptos: cantidadEstudiantes,
-          espaciosDisponibles: aula.capacidad ? aula.capacidad - cantidadEstudiantes : 'Sin límite'
+        asignacion: {
+          realizada: true,
+          timestamp: new Date().toISOString(),
+          aulaAnterior: examen.aula ? {
+            id: examen.aula.id,
+            nombre: examen.aula.nombre
+          } : null,
+          aulaNueva: {
+            id: aula.id,
+            nombre: aula.nombre,
+            capacidad: aula.capacidad
+          }
         }
       }
     });
 
   } catch (error) {
-    console.error('Error asignando aula:', error);
+    console.error('❌ Error asignando aula:', error);
+    
     return res.status(500).json({
       success: false,
       error: 'Error interno del servidor',
-      message: error.message
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 } 
