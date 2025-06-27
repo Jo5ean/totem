@@ -1,6 +1,8 @@
 import prisma from '../../../../../lib/db.js';
+import { withCors } from '../../../../../lib/cors.js';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
+
   if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
@@ -64,52 +66,63 @@ export default async function handler(req, res) {
       });
     }
 
-    // 3. Verificar conflictos de horario (opcional, pero recomendado)
-    const conflictos = await prisma.examen.findMany({
-      where: {
-        aulaId: parseInt(aulaId),
-        fecha: examen.fecha,
-        hora: examen.hora,
-        id: { not: parseInt(id) } // Excluir el examen actual
-      },
-      include: {
-        carrera: true
-      }
-    });
+    // 3. Obtener número de inscriptos del examen
+    const cantidadInscriptos = examen.cantidadInscriptos || 0;
 
-    if (conflictos.length > 0) {
-      return res.status(409).json({
-        success: false,
-        error: 'Conflicto de horario detectado',
+    // 4. Si el examen ya tenía aula asignada, restar los alumnos del aula anterior
+    if (examen.aulaId && examen.aulaId !== parseInt(aulaId)) {
+      await prisma.aula.update({
+        where: { id: examen.aulaId },
         data: {
-          conflictos: conflictos.map(c => ({
-            id: c.id,
-            materia: c.nombreMateria,
-            carrera: c.carrera.nombre,
-            fecha: c.fecha?.toISOString().split('T')[0],
-            hora: c.hora?.toTimeString().split(' ')[0]
-          }))
+          alumnosAsignados: {
+            decrement: cantidadInscriptos
+          }
         }
       });
     }
 
-    // 4. Asignar el aula al examen
-    const examenActualizado = await prisma.examen.update({
-      where: { id: parseInt(id) },
-      data: {
-        aulaId: parseInt(aulaId),
-        observaciones: observaciones || examen.observaciones,
-        updatedAt: new Date()
-      },
-      include: {
-        carrera: {
-          include: { facultad: true }
+    // 5. Asignar el aula al examen y actualizar contador de alumnos
+    const [examenActualizado] = await prisma.$transaction([
+      prisma.examen.update({
+        where: { id: parseInt(id) },
+        data: {
+          aulaId: parseInt(aulaId),
+          observaciones: observaciones || examen.observaciones,
+          updatedAt: new Date()
         },
-        aula: true
+        include: {
+          carrera: {
+            include: { facultad: true }
+          },
+          aula: true
+        }
+      }),
+      prisma.aula.update({
+        where: { id: parseInt(aulaId) },
+        data: {
+          alumnosAsignados: {
+            increment: cantidadInscriptos
+          }
+        }
+      })
+    ]);
+
+    // Obtener estadísticas actualizadas del aula
+    const aulaActualizada = await prisma.aula.findUnique({
+      where: { id: parseInt(aulaId) },
+      include: {
+        examenes: {
+          where: { activo: true },
+          select: {
+            id: true,
+            nombreMateria: true,
+            cantidadInscriptos: true
+          }
+        }
       }
     });
 
-    console.log(`✅ Aula asignada: Examen ${id} → Aula ${aula.nombre}`);
+    console.log(`✅ Aula asignada: Examen ${id} → Aula ${aula.nombre} (${cantidadInscriptos} alumnos)`);
 
     return res.status(200).json({
       success: true,
@@ -120,6 +133,7 @@ export default async function handler(req, res) {
           nombre: examenActualizado.nombreMateria,
           fecha: examenActualizado.fecha?.toISOString().split('T')[0],
           hora: examenActualizado.hora?.toTimeString().split(' ')[0],
+          inscriptos: cantidadInscriptos,
           carrera: {
             nombre: examenActualizado.carrera.nombre,
             facultad: examenActualizado.carrera.facultad.nombre
@@ -128,13 +142,15 @@ export default async function handler(req, res) {
             id: examenActualizado.aula.id,
             nombre: examenActualizado.aula.nombre,
             capacidad: examenActualizado.aula.capacidad,
-            ubicacion: examenActualizado.aula.ubicacion
+            ubicacion: examenActualizado.aula.ubicacion,
+            alumnosAsignados: aulaActualizada.alumnosAsignados
           },
           observaciones: examenActualizado.observaciones
         },
         asignacion: {
           realizada: true,
           timestamp: new Date().toISOString(),
+          inscriptosAsignados: cantidadInscriptos,
           aulaAnterior: examen.aula ? {
             id: examen.aula.id,
             nombre: examen.aula.nombre
@@ -142,7 +158,9 @@ export default async function handler(req, res) {
           aulaNueva: {
             id: aula.id,
             nombre: aula.nombre,
-            capacidad: aula.capacidad
+            capacidad: aula.capacidad,
+            alumnosAsignados: aulaActualizada.alumnosAsignados,
+            resumenUso: `${aulaActualizada.alumnosAsignados} alumnos asignados de ${aula.capacidad} disponibles`
           }
         }
       }
@@ -158,4 +176,6 @@ export default async function handler(req, res) {
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
-} 
+}
+
+export default withCors(handler); 

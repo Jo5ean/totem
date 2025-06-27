@@ -39,10 +39,15 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. Si tiene datos del TOTEM, obtener el código de materia
+    // 2. Obtener datos del TOTEM para materia y areaTema
     let codigoMateria = null;
-    if (examen.examenTotem && examen.examenTotem.length > 0) {
-      codigoMateria = examen.examenTotem[0].materiaTotem;
+    let areaTema = null;
+    let carreraTotem = null;
+    
+    if (examen.examenTotem) {
+      codigoMateria = examen.examenTotem.materiaTotem;
+      areaTema = examen.examenTotem.areaTemaTotem;
+      carreraTotem = examen.examenTotem.carreraTotem;
     }
 
     if (!codigoMateria) {
@@ -54,11 +59,14 @@ export default async function handler(req, res) {
             id: examen.id,
             nombre: examen.nombreMateria,
             fecha: examen.fecha,
-            hora: examen.hora
+            hora: examen.hora,
+            cantidadInscriptos: examen.cantidadInscriptos || 0
           }
         }
       });
     }
+
+    console.log(`📡 Consultando materia ${codigoMateria} con areaTema ${areaTema} y carrera ${carreraTotem}`);
 
     // 3. Consultar inscriptos desde API externa de UCASAL
     const fechaDesde = new Date().toLocaleDateString('es-AR', {
@@ -75,14 +83,14 @@ export default async function handler(req, res) {
 
     const apiUrl = `https://sistemasweb-desa.ucasal.edu.ar/api/v1/acta/materia/${codigoMateria}?rendida=false&fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}`;
     
-    console.log(`Consultando inscriptos para materia ${codigoMateria}:`, apiUrl);
+    console.log(`📡 URL de consulta: ${apiUrl}`);
     
     const response = await fetch(apiUrl);
     
     if (!response.ok) {
       console.error('Error en API externa:', response.status, response.statusText);
       
-      // Si la API está caída, devolver información básica del examen
+      // Si la API está caída, devolver información básica del examen con cantidad guardada
       return res.status(200).json({
         success: true,
         warning: 'API externa no disponible - mostrando datos locales únicamente',
@@ -101,19 +109,22 @@ export default async function handler(req, res) {
               nombre: examen.aula.nombre,
               capacidad: examen.aula.capacidad
             } : null,
-            codigoMateria: codigoMateria
+            codigoMateria: codigoMateria,
+            areaTema: areaTema,
+            carreraTotem: carreraTotem
           },
           inscriptos: [],
-          cantidadInscriptos: 0,
-          apiExternaDisponible: false
+          cantidadInscriptos: examen.cantidadInscriptos || 0,
+          apiExternaDisponible: false,
+          ultimaConsulta: examen.fechaUltConsulta
         }
       });
     }
 
-    const inscriptos = await response.json();
+    const datosCompletos = await response.json();
     
-    if (!Array.isArray(inscriptos)) {
-      console.warn('Respuesta de API externa no es un array:', inscriptos);
+    if (!Array.isArray(datosCompletos)) {
+      console.warn('Respuesta de API externa no es un array:', datosCompletos);
       return res.status(200).json({
         success: true,
         data: {
@@ -131,7 +142,9 @@ export default async function handler(req, res) {
               nombre: examen.aula.nombre,
               capacidad: examen.aula.capacidad
             } : null,
-            codigoMateria: codigoMateria
+            codigoMateria: codigoMateria,
+            areaTema: areaTema,
+            carreraTotem: carreraTotem
           },
           inscriptos: [],
           cantidadInscriptos: 0,
@@ -140,10 +153,47 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log(`✅ Encontrados ${inscriptos.length} inscriptos para examen ${id}`);
+    // 4. FILTRAR CORRECTAMENTE por areaTema y carrera como indica el usuario
+    console.log(`🔍 Aplicando filtro: areaTema=${areaTema} && carrera=${carreraTotem}`);
+    
+    const inscriptosFiltrados = datosCompletos.filter(registro => {
+      const cumpleAreaTema = areaTema ? registro.areaTema == areaTema : true;
+      const cumpleCarrera = carreraTotem ? registro.carrera == carreraTotem : true;
+      const tieneAlumnos = registro.alumnos && registro.alumnos.length > 0;
+      
+      console.log(`Registro: areaTema=${registro.areaTema}, carrera=${registro.carrera}, alumnos=${registro.alumnos?.length || 0}`);
+      console.log(`Cumple filtros: areaTema=${cumpleAreaTema}, carrera=${cumpleCarrera}, tieneAlumnos=${tieneAlumnos}`);
+      
+      return cumpleAreaTema && cumpleCarrera && tieneAlumnos;
+    });
 
-    // 4. Procesar y formatear inscriptos
-    const inscriptosFormateados = inscriptos.map(inscripto => ({
+    console.log(`✅ Después del filtro: ${inscriptosFiltrados.length} registros válidos`);
+
+    // 5. Extraer todos los alumnos de los registros filtrados
+    let todosLosInscriptos = [];
+    inscriptosFiltrados.forEach(registro => {
+      if (registro.alumnos && Array.isArray(registro.alumnos)) {
+        todosLosInscriptos = todosLosInscriptos.concat(registro.alumnos);
+      }
+    });
+
+    console.log(`📊 Total de inscriptos encontrados: ${todosLosInscriptos.length}`);
+
+    // 6. FILTRAR POR MODALIDAD VIRTUAL/A DISTANCIA
+    // Solo inscriptos con sector "3" o nombreModo "CAMPUS VIRTUAL"
+    const inscriptosVirtuales = todosLosInscriptos.filter(inscripto => {
+      const esSectorTres = inscripto.sector === "3";
+      const esCampusVirtual = inscripto.nombreModo === "CAMPUS VIRTUAL";
+      
+      console.log(`🎯 Inscripto ${inscripto.apen}: sector="${inscripto.sector}", nombreSector="${inscripto.nombreSector}", modo="${inscripto.nombreModo}", esVirtual=${esSectorTres || esCampusVirtual}`);
+      
+      return esSectorTres || esCampusVirtual;
+    });
+
+    console.log(`🎓 Inscriptos de modalidad virtual: ${inscriptosVirtuales.length} de ${todosLosInscriptos.length} totales`);
+
+    // 7. Formatear inscriptos virtuales
+    const inscriptosFormateados = inscriptosVirtuales.map(inscripto => ({
       dni: inscripto.ndocu,
       nombre: inscripto.apen,
       lugar: inscripto.nombreLugar,
@@ -152,9 +202,23 @@ export default async function handler(req, res) {
       fechaInscripcion: inscripto.fecActa
     }));
 
-    // 5. Determinar si necesita asignación de aula
-    const necesitaAsignacion = !examen.aula && inscriptos.length > 0;
-    const sugerenciaAula = necesitaAsignacion ? await sugerirAula(inscriptos.length) : null;
+    // 8. GUARDAR cantidad de inscriptos virtuales en la base de datos
+    try {
+      await prisma.examen.update({
+        where: { id: parseInt(id) },
+        data: {
+          cantidadInscriptos: inscriptosVirtuales.length,
+          fechaUltConsulta: new Date()
+        }
+      });
+      console.log(`💾 Guardado: ${inscriptosVirtuales.length} inscriptos virtuales para examen ${id}`);
+    } catch (updateError) {
+      console.error('Error actualizando cantidad de inscriptos:', updateError);
+    }
+
+    // 9. Determinar si necesita asignación de aula
+    const necesitaAsignacion = !examen.aula && inscriptosVirtuales.length > 0;
+    const sugerenciaAula = necesitaAsignacion ? await sugerirAula(inscriptosVirtuales.length) : null;
 
     return res.status(200).json({
       success: true,
@@ -174,56 +238,73 @@ export default async function handler(req, res) {
             capacidad: examen.aula.capacidad
           } : null,
           codigoMateria: codigoMateria,
+          areaTema: areaTema,
+          carreraTotem: carreraTotem,
           tipoExamen: examen.tipoExamen,
           observaciones: examen.observaciones,
           requierePc: examen.requierePc
         },
         inscriptos: inscriptosFormateados,
-        cantidadInscriptos: inscriptos.length,
+        cantidadInscriptos: inscriptosVirtuales.length,
         necesitaAsignacion: necesitaAsignacion,
         sugerenciaAula: sugerenciaAula,
         apiExternaDisponible: true,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        filtrosAplicados: {
+          codigoMateria: codigoMateria,
+          areaTema: areaTema,
+          carrera: carreraTotem,
+          fechaDesde,
+          fechaHasta
+        }
       }
     });
 
   } catch (error) {
     console.error('❌ Error consultando inscriptos:', error);
     
-    // En caso de error, devolver datos básicos del examen
-    const examenBasico = await prisma.examen.findUnique({
-      where: { id: parseInt(id) },
-      include: {
-        carrera: { include: { facultad: true } },
-        aula: true
-      }
-    });
+    // En caso de error, devolver datos básicos del examen con cantidad guardada
+    try {
+      const examenBasico = await prisma.examen.findUnique({
+        where: { id: parseInt(id) },
+        include: {
+          carrera: { include: { facultad: true } },
+          aula: true
+        }
+      });
 
-    return res.status(200).json({
-      success: false,
-      error: 'Error consultando inscriptos desde API externa',
-      data: {
-        examen: examenBasico ? {
-          id: examenBasico.id,
-          nombre: examenBasico.nombreMateria,
-          fecha: examenBasico.fecha?.toISOString().split('T')[0],
-          hora: examenBasico.hora?.toTimeString().split(' ')[0],
-          carrera: {
-            nombre: examenBasico.carrera.nombre,
-            facultad: examenBasico.carrera.facultad.nombre
-          },
-          aula: examenBasico.aula ? {
-            id: examenBasico.aula.id,
-            nombre: examenBasico.aula.nombre,
-            capacidad: examenBasico.aula.capacidad
-          } : null
-        } : null,
-        inscriptos: [],
-        cantidadInscriptos: 0,
-        apiExternaDisponible: false
-      },
-      message: error.message
-    });
+      return res.status(200).json({
+        success: false,
+        error: 'Error consultando inscriptos desde API externa',
+        data: {
+          examen: examenBasico ? {
+            id: examenBasico.id,
+            nombre: examenBasico.nombreMateria,
+            fecha: examenBasico.fecha?.toISOString().split('T')[0],
+            hora: examenBasico.hora?.toTimeString().split(' ')[0],
+            carrera: {
+              nombre: examenBasico.carrera.nombre,
+              facultad: examenBasico.carrera.facultad.nombre
+            },
+            aula: examenBasico.aula ? {
+              id: examenBasico.aula.id,
+              nombre: examenBasico.aula.nombre,
+              capacidad: examenBasico.aula.capacidad
+            } : null
+          } : null,
+          inscriptos: [],
+          cantidadInscriptos: examenBasico?.cantidadInscriptos || 0,
+          apiExternaDisponible: false
+        },
+        message: error.message
+      });
+    } catch (fallbackError) {
+      return res.status(500).json({
+        success: false,
+        error: 'Error interno del servidor',
+        message: error.message
+      });
+    }
   }
 }
 

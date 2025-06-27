@@ -1,6 +1,8 @@
 import prisma from '../../../../lib/db.js';
+import { withCors } from '../../../../lib/cors.js';
 
-export default async function handler(req, res) {
+async function handler(req, res) {
+
   try {
     switch (req.method) {
       case 'GET':
@@ -57,11 +59,21 @@ async function handleGet(req, res) {
     prisma.aula.count({ where })
   ]);
 
+  // Agregar estadísticas de uso para cada aula
+  const aulasConEstadisticas = aulas.map(aula => ({
+    ...aula,
+    estadisticas: {
+      examenesAsignados: aula._count.examenes,
+      alumnosAsignados: aula.alumnosAsignados,
+      porcentajeUso: aula.capacidad ? Math.round((aula.alumnosAsignados / aula.capacidad) * 100) : 0
+    }
+  }));
+
   const totalPages = Math.ceil(total / limitNum);
 
   return res.status(200).json({
     success: true,
-    data: aulas,
+    data: aulasConEstadisticas,
     pagination: {
       page: pageNum,
       limit: limitNum,
@@ -110,4 +122,6 @@ async function handlePost(req, res) {
     data: aula,
     message: 'Aula creada exitosamente'
   });
-} 
+}
+
+export default withCors(handler); 

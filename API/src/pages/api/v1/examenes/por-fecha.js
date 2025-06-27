@@ -9,7 +9,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { fechaDesde, fechaHasta, soloSinAula } = req.query;
+    const { fechaDesde, fechaHasta, soloSinAula, soloConAula } = req.query;
 
     // Construir filtros
     const where = {};
@@ -43,10 +43,15 @@ export default async function handler(req, res) {
     if (soloSinAula === 'true') {
       where.aulaId = null;
     }
+    
+    // Filtrar solo exámenes con aula si se solicita
+    if (soloConAula === 'true') {
+      where.aulaId = { not: null };
+    }
 
     console.log(`📅 Consultando exámenes con filtros:`, where);
 
-    // Obtener exámenes
+    // Obtener exámenes con include (no select para evitar problemas)
     const examenes = await prisma.examen.findMany({
       where,
       include: {
@@ -56,14 +61,7 @@ export default async function handler(req, res) {
           }
         },
         aula: true,
-        examenTotem: {
-          select: {
-            materiaTotem: true,
-            docenteTotem: true,
-            monitoreoTotem: true,
-            controlTotem: true
-          }
-        }
+        examenTotem: true // ✅ Incluir todo el objeto examenTotem
       },
       orderBy: [
         { fecha: 'asc' },
@@ -74,11 +72,11 @@ export default async function handler(req, res) {
 
     console.log(`✅ Encontrados ${examenes.length} exámenes`);
 
-    // Agrupar por fecha y consultar inscriptos
+    // Agrupar por fecha usando datos locales optimizados
     const examenesPorFecha = {};
     const fechasUnicas = new Set();
 
-    console.log(`🔍 Consultando inscriptos para ${examenes.length} exámenes...`);
+    console.log(`📊 Procesando ${examenes.length} exámenes con datos locales (actualizado)...`);
 
     for (const examen of examenes) {
       const fechaStr = examen.fecha ? examen.fecha.toISOString().split('T')[0] : 'Sin fecha';
@@ -88,50 +86,16 @@ export default async function handler(req, res) {
         examenesPorFecha[fechaStr] = [];
       }
 
-      // Obtener código de materia
-      const codigoMateria = examen.examenTotem && examen.examenTotem.length > 0 
-        ? examen.examenTotem[0].materiaTotem 
-        : null;
-
-      // Consultar inscriptos si tiene código de materia
-      let inscriptos = 0;
-      let estadoInscriptos = 'sin-codigo'; // sin-codigo, consultando, error, success
-
-      if (codigoMateria) {
-        try {
-          estadoInscriptos = 'consultando';
-          
-          const fechaDesde = new Date().toLocaleDateString('es-AR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-          });
-          
-          const fechaHasta = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('es-AR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-          });
-
-          const apiUrl = `https://sistemasweb-desa.ucasal.edu.ar/api/v1/acta/materia/${codigoMateria}?rendida=false&fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}`;
-          
-          const response = await fetch(apiUrl);
-          
-          if (response.ok) {
-            const inscriptosData = await response.json();
-            if (Array.isArray(inscriptosData)) {
-              inscriptos = inscriptosData.length;
-              estadoInscriptos = 'success';
-            } else {
-              estadoInscriptos = 'error';
-            }
-          } else {
-            estadoInscriptos = 'error';
-          }
-        } catch (error) {
-          console.log(`⚠️ Error consultando inscriptos para materia ${codigoMateria}:`, error.message);
-          estadoInscriptos = 'error';
-        }
+      // Obtener código de materia (examenTotem es un objeto, no array)
+      const codigoMateria = examen.examenTotem?.materiaTotem || null;
+      
+      // DEBUG: Log específico para examen 6177
+      if (examen.id === 6177) {
+        console.log(`🔍 DEBUG Examen 6177:`);
+        console.log(`   cantidadInscriptos: ${JSON.stringify(examen.cantidadInscriptos)}`);
+        console.log(`   fechaUltConsulta: ${examen.fechaUltConsulta}`);
+        console.log(`   Resultado inscriptos: ${examen.cantidadInscriptos || 0}`);
+        console.log(`   Todas las propiedades:`, Object.keys(examen));
       }
 
       examenesPorFecha[fechaStr].push({
@@ -153,20 +117,17 @@ export default async function handler(req, res) {
         modalidad: examen.modalidadExamen || 'presencial',
         observaciones: examen.observaciones,
         requierePc: examen.requierePc || false,
-        // Datos del TOTEM
+        // Datos del TOTEM (corregido: examenTotem es objeto, no array)
         codigoMateria: codigoMateria,
-        docente: examen.examenTotem && examen.examenTotem.length > 0 
-          ? examen.examenTotem[0].docenteTotem 
-          : null,
-        monitoreo: examen.examenTotem && examen.examenTotem.length > 0 
-          ? examen.examenTotem[0].monitoreoTotem 
-          : null,
-        control: examen.examenTotem && examen.examenTotem.length > 0 
-          ? examen.examenTotem[0].controlTotem 
-          : null,
-        // Datos de inscriptos
-        inscriptos: inscriptos,
-        estadoInscriptos: estadoInscriptos,
+        areaTema: examen.examenTotem?.areaTemaTotem || null,
+        carreraTotem: examen.examenTotem?.carreraTotem || null,
+        docente: examen.examenTotem?.docenteTotem || null,
+        monitoreo: examen.examenTotem?.monitoreoTotem || null,
+        control: examen.examenTotem?.controlTotem || null,
+        // Datos de inscriptos (ahora desde BD local)
+        inscriptos: examen.cantidadInscriptos || 0,
+        estadoInscriptos: examen.cantidadInscriptos !== null ? 'success' : 'sin-consultar',
+        ultimaActualizacion: examen.fechaUltConsulta,
         // Estado de asignación
         necesitaAsignacion: !examen.aula,
         createdAt: examen.createdAt
@@ -217,7 +178,8 @@ export default async function handler(req, res) {
       filtros: {
         fechaDesde: fechaDesde || 'hoy',
         fechaHasta: fechaHasta || 'próximos 30 días',
-        soloSinAula: soloSinAula === 'true'
+        soloSinAula: soloSinAula === 'true',
+        soloConAula: soloConAula === 'true'
       },
       timestamp: new Date().toISOString()
     });

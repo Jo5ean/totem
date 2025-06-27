@@ -22,7 +22,7 @@ export default function Dashboard() {
       // Usar versión simple para depuración
       const response = await totemApi.getEstadisticasSimple() as { data: EstadisticasTotem };
       setEstadisticas(response.data);
-      console.log('✅ Estadísticas cargadas exitosamente:', response.data);
+
     } catch (error) {
       // Si falla la versión simple, intentar con la ligera
       try {

@@ -57,6 +57,8 @@ model Examen {
   criterioAsignacion String?      @map("criterio_asignacion") @db.VarChar(100)
   modalidadExamen    String?      @map("modalidad_examen") @db.VarChar(50)
   requierePc         Boolean      @default(false) @map("requiere_pc")
+  cantidadInscriptos Int?         @default(0) @map("cantidad_inscriptos")
+  fechaUltConsulta   DateTime?    @map("fecha_ult_consulta")
   actasExamen        ActaExamen[]
   aula               Aula?        @relation(fields: [aulaId], references: [id])
   carrera            Carrera      @relation(fields: [carreraId], references: [id], onDelete: Cascade)
@@ -97,14 +99,15 @@ model Estudiante {
 }
 
 model Aula {
-  id         Int      @id @default(autoincrement())
-  nombre     String   @unique @db.VarChar(100)
-  capacidad  Int?
-  ubicacion  String?  @db.VarChar(255)
-  disponible Boolean  @default(true)
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  examenes   Examen[]
+  id               Int      @id @default(autoincrement())
+  nombre           String   @unique @db.VarChar(100)
+  capacidad        Int?
+  ubicacion        String?  @db.VarChar(255)
+  disponible       Boolean  @default(true)
+  alumnosAsignados Int      @default(0) @map("alumnos_asignados")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  examenes         Examen[]
 
   @@map("aulas")
 }

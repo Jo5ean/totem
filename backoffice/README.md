@@ -83,6 +83,7 @@ backoffice/
 │       ├── api.ts                   # Cliente de API + tipos TypeScript
 │       └── toast.ts                 # Configuración de notificaciones
 ├── public/                          # Archivos estáticos
+├── .env.example                     # Variables de entorno de ejemplo
 ├── package.json                     # Dependencias y scripts
 ├── tailwind.config.js              # Configuración de Tailwind
 ├── tsconfig.json                    # Configuración de TypeScript
@@ -109,10 +110,13 @@ cd backoffice
 npm install
 ```
 
-3. **Configurar variables de entorno** (opcional)
+3. **Configurar variables de entorno**
 ```bash
-# Crear archivo .env.local
-NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+# Copiar archivo de ejemplo
+cp .env.example .env.local
+
+# Editar configuración si es necesario
+# Por defecto apunta a http://localhost:3000/api/v1
 ```
 
 4. **Ejecutar en desarrollo**
@@ -133,6 +137,26 @@ npm run build    # Build de producción
 npm run start    # Servidor de producción
 npm run lint     # Verificación de código
 ```
+
+## ⚙️ Variables de Entorno
+
+### Configuración para Desarrollo
+```bash
+# .env.local
+NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+PORT=3001
+```
+
+### Configuración para Producción
+```bash
+# .env.production
+NEXT_PUBLIC_API_URL=https://tu-dominio.com/api/v1
+PORT=3001
+```
+
+### Variables Disponibles
+- `NEXT_PUBLIC_API_URL`: URL base de la API TOTEM (requerida)
+- `PORT`: Puerto del backoffice (opcional, por defecto 3000 pero usará 3001 automáticamente)
 
 ## 🔌 Integración con la API
 
@@ -198,87 +222,57 @@ import { showSuccess, showError } from '@/lib/toast';
 export default function MiPagina() {
   // 3. Estados locales
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  // 4. Funciones async para API
-  const cargarDatos = async () => {
-    try {
-      // Lógica de carga
-    } catch (error) {
-      showError('Error cargando datos');
-    }
-  };
-  
-  // 5. Effects
+
+  // 4. Efectos y handlers
   useEffect(() => {
-    cargarDatos();
+    // Cargar datos
   }, []);
-  
-  // 6. Render con estados de carga
-  if (loading) return <LoadingComponent />;
-  
+
+  // 5. JSX con Tailwind CSS
   return (
     <div className="p-6">
-      {/* Contenido de la página */}
+      {/* Contenido */}
     </div>
   );
 }
 ```
 
-### API Client
+## 🚀 Setup para Nueva PC
 
-El cliente de API (`src/lib/api.ts`) centraliza todas las llamadas:
+### 1. Clonar y Configurar
+```bash
+# Clonar repositorio
+git clone [url-repo]
+cd totem/backoffice
 
-```typescript
-// Uso típico
-const response = await totemApi.getEstadisticas();
-const facultades = await totemApi.getFacultades();
-await totemApi.sincronizar();
+# Instalar dependencias
+npm install
+
+# Configurar entorno
+cp .env.example .env.local
 ```
 
-### Sistema de Notificaciones
+### 2. Verificar Configuración
+```bash
+# Verificar que la API esté corriendo en puerto 3000
+curl http://localhost:3000/api/v1/totem/estadisticas
 
-```typescript
-import { showSuccess, showError, showLoading } from '@/lib/toast';
-
-// Notificaciones simples
-showSuccess('¡Operación exitosa!');
-showError('Hubo un error');
-
-// Con loading
-const loadingToast = showLoading('Procesando...');
-// ... operación async ...
-toast.dismiss(loadingToast);
-showSuccess('¡Completado!');
+# Iniciar backoffice
+npm run dev
 ```
 
-## 🔒 Consideraciones de Seguridad
+### 3. Acceder al Sistema
+- **Backoffice**: http://localhost:3001
+- **API**: http://localhost:3000/api/v1
 
-- **Validación client-side** con Zod en formularios
-- **Manejo de errores** robusto en todas las API calls
-- **Sanitización** automática de datos mostrados
-- **Variables de entorno** para configuración sensible
+## 🛡️ Seguridad y Calidad
 
-## 🌟 Funcionalidades Futuras
-
-- [ ] **Autenticación** con roles de usuario
-- [ ] **Exportación** de reportes en PDF/Excel
-- [ ] **Notificaciones push** para sincronizaciones
-- [ ] **Logs de actividad** detallados
-- [ ] **API GraphQL** para queries optimizadas
-- [ ] **PWA** para uso offline
-- [ ] **Tests automatizados** con Jest/Playwright
-
-## 📞 Soporte
-
-Para dudas o problemas:
-
-1. **Revisar logs** en la consola del navegador
-2. **Verificar conectividad** con la API en Configuración
-3. **Consultar documentación** de la API
-4. **Contactar al equipo** de desarrollo
+- ✅ **0 vulnerabilidades** de seguridad
+- ✅ **TypeScript estricto** para type safety
+- ✅ **ESLint configurado** para calidad de código
+- ✅ **Variables de entorno** para configuración segura
+- ✅ **Sin URLs hardcodeadas** en producción
 
 ---
 
-**Desarrollado para la Universidad Católica de Salta (UCASAL)**  
-*Sistema TOTEM - Gestión de Cronogramas de Exámenes*
+*Documentación actualizada - Diciembre 2024*

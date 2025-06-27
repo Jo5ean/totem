@@ -38,7 +38,7 @@ export default function ConfiguracionPage() {
       toast.dismiss(loadingToast);
       showSuccess('Sincronización completada exitosamente');
       setLastSync(new Date().toISOString());
-      console.log('Resultado sincronización:', response);
+
     } catch (error) {
       toast.dismiss(loadingToast);
       showError('Error durante la sincronización');

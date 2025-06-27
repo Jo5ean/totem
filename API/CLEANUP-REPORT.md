@@ -1,152 +1,122 @@
-# 🧹 Reporte de Limpieza - Archivos Duplicados
+# 🧹 REPORTE DE LIMPIEZA - API TOTEM
 
-**Fecha:** ${new Date().toISOString().split('T')[0]}  
-**Pull de:** rama `casi-listo`  
-**Archivos analizados:** 14 nuevos archivos  
-
-## ❌ ARCHIVOS ELIMINADOS (Duplicados)
-
-### 1. `ejecutar-sync.js` ❌ ELIMINADO
-**Razón:** Duplica funcionalidad existente
-**Reemplazado por:**
-- ✅ `API/src/pages/api/v1/totem/simple-sync.js` (endpoint)
-- ✅ `API/scripts/setup-completo.js` (script maestro)
-
-**Funcionalidad:** Sincronización de datos desde Sheet.best
+## 📅 **Fecha de Limpieza:** 27 de Junio 2025
 
 ---
 
-### 2. `ejecutar-mapeos.js` ❌ ELIMINADO  
-**Razón:** Duplica múltiples endpoints existentes
-**Reemplazado por:**
-- ✅ `API/src/pages/api/v1/totem/mapear-carreras-automatico.js`
-- ✅ `API/src/pages/api/v1/totem/crear-y-mapear-carreras.js`
-- ✅ `API/src/pages/api/v1/totem/setup-mapeos.js`
-- ✅ `API/scripts/setup-completo.js` (orquesta todo)
+## ✅ **ARCHIVOS ELIMINADOS EXITOSAMENTE**
 
-**Funcionalidad:** Mapeo automático de carreras y sectores
-
----
-
-### 3. `inicializar-sistema.js` ❌ ELIMINADO
-**Razón:** Duplica completamente nuestros scripts especializados
-**Reemplazado por:**
-- ✅ `API/scripts/configurar-aulas-iniciales.js`
-- ✅ `API/scripts/setup-totem-mapeos.js`  
-- ✅ `API/scripts/mapear-carreras-automatico.js`
-- ✅ `API/scripts/setup-completo.js` (ejecuta todo)
-
-**Funcionalidad:** Configuración inicial del sistema completo
-
----
-
-### 4. `verificar-datos.js` ❌ ELIMINADO
-**Razón:** Funcionalidad limitada vs endpoint existente
-**Reemplazado por:**
-- ✅ `API/src/pages/api/v1/totem/verify-database.js` (más completo)
-
-**Funcionalidad:** Verificación de estado de la base de datos
-
----
-
-## ✅ ARCHIVOS CONSERVADOS (Útiles)
-
-### 1. `test-inscripciones.js` ✅ CONSERVADO
-**Propósito:** Prueba el endpoint `/api/v1/examenes/inscripciones`
-**Por qué se conserva:** 
-- Función específica de testing
-- No duplica funcionalidad existente
-- Útil para debugging del sistema de inscripciones
-
----
-
-### 2. `test-endpoint.js` ✅ CONSERVADO
-**Propósito:** Prueba el endpoint `/api/v1/estudiantes/examenes/[dni]`
-**Por qué se conserva:**
-- Script de testing específico
-- Útil para probar funcionalidad de DNI
-- No hay equivalente
-
----
-
-### 3. `buscar-dni-inscripto.js` ✅ CONSERVADO
-**Propósito:** Encuentra DNIs reales para testing cruzado con API externa
-**Por qué se conserva:**
-- Funcionalidad única de debugging
-- Integra con API externa de UCASAL
-- Herramienta valiosa para validación de datos
-
----
-
-## 📊 ESTADÍSTICAS DE LIMPIEZA
-
-- **Archivos analizados:** 14
-- **Archivos eliminados:** 4 (28.6%)
-- **Archivos conservados:** 3 (21.4%)
-- **Archivos existentes sin conflicto:** 7 (50%)
-
-## 🎯 BENEFICIOS DE LA LIMPIEZA
-
-### ✅ Eliminación de Duplicados
-- Evita confusión sobre qué script usar
-- Mantiene una sola fuente de verdad por funcionalidad
-- Reduce mantenimiento de código duplicado
-
-### ✅ Organización Mejorada
-- Scripts de testing en raíz de API (fácil acceso)
-- Scripts de configuración en `/scripts/` (organizados)
-- Endpoints en `/src/pages/api/` (estructura estándar)
-
-### ✅ Funcionalidad Preservada
-- Toda la funcionalidad importante se mantiene
-- Scripts de testing valiosos conservados
-- Mejor organización sin pérdida de features
-
-## 🚀 RECOMENDACIONES POST-LIMPIEZA
-
-### Usar el Script Maestro
+### **1. Scripts de Testing y Debugging Obsoletos**
 ```bash
-# Para configuración completa desde cero
-node scripts/setup-completo.js
+❌ test-endpoint.js (1KB)
+❌ test-inscripciones.js (2.3KB) 
+❌ buscar-dni-inscripto.js (4.3KB)
+❌ inspeccionar-api-externa.js (3.4KB)
+❌ probar-dni-real.js (3.8KB)
+❌ consultacarreras.json (1.3MB) ⭐ MAYOR AHORRO
 ```
 
-### Para Testing Individual
+**💾 Espacio Liberado:** ~1.32MB
+
+---
+
+## 🔧 **DEPENDENCIAS CORREGIDAS**
+
+### **Agregadas (faltantes pero usadas):**
+```json
++ "cors": "^2.8.5"
++ "express": "^4.18.2"
+```
+
+### **Eliminadas (declaradas pero no usadas):**
+```json
+- "typescript": "^5.6.3"
+```
+
+### **Script Agregado:**
+```json
++ "server": "node server.js"
+```
+
+---
+
+## 📁 **ARCHIVOS CRÍTICOS MANTENIDOS**
+
+### **✅ CSVs Necesarios para Setup:**
+- `Codcar_y_Carrera.csv` - Usado por `inicializar-desde-cero.js`
+- `sectores_202506061224.csv` - Referenciado en documentación
+
+### **✅ Configuración Dual Temporal:**
+- `server.js` - Express server (funcionalidad única por ahora)
+- `/src/routes/` - 21 endpoints Express con lógica específica
+- `/src/pages/api/` - 40 endpoints Next.js API
+
+---
+
+## ⚠️ **PENDIENTES PARA FUTURAS OPTIMIZACIONES**
+
+### **1. Migración Arquitectónica (Fase 2)**
 ```bash
-# Probar inscripciones
-node test-inscripciones.js
-
-# Probar endpoint de DNI
-node test-endpoint.js
-
-# Buscar DNIs reales
-node buscar-dni-inscripto.js
+# Cuando se confirme equivalencia funcional:
+rm server.js
+rm -rf src/routes/
+rm -rf src/controllers/
 ```
 
-### Para Sincronización Manual
+### **2. Evaluación de CSVs**
+- Verificar si `sectores_202506061224.csv` se usa activamente
+- Considerar mover CSVs a `/data/` o base de datos
+
+### **3. Optimización ESLint**
+- Configurar scripts de linting activos
+- O remover `eslint.config.mjs` si no se usa
+
+---
+
+## 📊 **IMPACTO DE LA LIMPIEZA**
+
+| Métrica | Antes | Después | Mejora |
+|---------|-------|---------|--------|
+| **Archivos obsoletos** | 6 | 0 | -6 archivos |
+| **Tamaño proyecto** | ~114MB | ~113MB | -1.32MB |
+| **Dependencias faltantes** | 2 | 0 | ✅ Corregido |
+| **Dependencias innecesarias** | 1 | 0 | ✅ Removido |
+
+---
+
+## 🎯 **RESULTADO FINAL**
+
+✅ **Proyecto más limpio y estable**  
+✅ **Dependencias correctamente declaradas**  
+✅ **Archivos de setup preservados**  
+✅ **Funcionalidad intacta**  
+✅ **Preparado para deployment en nueva PC**
+
+---
+
+## 🚀 **INSTRUCCIONES PARA NUEVA PC**
+
 ```bash
-# Via API
-curl http://localhost:3000/api/v1/totem/simple-sync
+# 1. Clonar repositorio
+git clone [repo-url]
+cd totem/API
 
-# Via script maestro (incluye todo)
-node scripts/setup-completo.js
+# 2. Instalar dependencias
+npm install
+
+# 3. Configurar base de datos
+npx prisma generate
+npx prisma db push
+
+# 4. Inicializar datos (si es necesario)
+node scripts/inicializar-desde-cero.js
+
+# 5. Iniciar servidor
+npm run dev        # Next.js API
+# O
+npm run server     # Express server (si se necesita)
 ```
 
-## 🔧 ESTRUCTURA FINAL RECOMENDADA
+---
 
-```
-API/
-├── scripts/                          # Scripts de configuración
-│   ├── setup-completo.js            # ⭐ Script maestro
-│   ├── configurar-aulas-iniciales.js
-│   ├── mapear-carreras-automatico.js
-│   └── setup-totem-mapeos.js
-├── test-inscripciones.js            # 🧪 Testing
-├── test-endpoint.js                 # 🧪 Testing  
-├── buscar-dni-inscripto.js          # 🔍 Debugging
-└── src/pages/api/v1/                # 🌐 Endpoints
-    ├── totem/simple-sync.js
-    ├── totem/verify-database.js
-    └── ...
-```
-
-**¡Limpieza completada exitosamente! 🎉** 
+*Limpieza realizada el 27/06/2025 - Sistema optimizado y estable* ✨ 
