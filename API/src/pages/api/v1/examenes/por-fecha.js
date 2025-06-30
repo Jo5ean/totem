@@ -30,8 +30,12 @@ export default async function handler(req, res) {
 
     // Si no se especifican fechas, usar próximos 30 días
     if (!fechaDesde && !fechaHasta) {
-      const hoy = new Date();
+      const ahora = new Date();
+      // CORREGIDO: Usar medianoche UTC puro (00:00:00.000Z)
+      const fechaActual = ahora.toISOString().split('T')[0]; // YYYY-MM-DD
+      const hoy = new Date(fechaActual + 'T00:00:00.000Z');
       const en30Dias = new Date(hoy.getTime() + 30 * 24 * 60 * 60 * 1000);
+      
       
       where.fecha = {
         gte: hoy,

@@ -179,15 +179,14 @@ export default async function handler(req, res) {
 
     console.log(`📊 Total de inscriptos encontrados: ${todosLosInscriptos.length}`);
 
-    // 6. FILTRAR POR MODALIDAD VIRTUAL/A DISTANCIA
-    // Solo inscriptos con sector "3" o nombreModo "CAMPUS VIRTUAL"
+    // 6. FILTRAR ÚNICAMENTE POR LUGAR "3" (SALTA - DISTANCIA)
+    // Solo inscriptos con lugar "3" (Salta - Distancia)
     const inscriptosVirtuales = todosLosInscriptos.filter(inscripto => {
-      const esSectorTres = inscripto.sector === "3";
-      const esCampusVirtual = inscripto.nombreModo === "CAMPUS VIRTUAL";
+      const esLugarTres = inscripto.lugar === "3";
       
-      console.log(`🎯 Inscripto ${inscripto.apen}: sector="${inscripto.sector}", nombreSector="${inscripto.nombreSector}", modo="${inscripto.nombreModo}", esVirtual=${esSectorTres || esCampusVirtual}`);
+      console.log(`🎯 Inscripto ${inscripto.apen}: lugar="${inscripto.lugar}", nombreLugar="${inscripto.nombreLugar}", modo="${inscripto.nombreModo}", cumpleFiltro=${esLugarTres}`);
       
-      return esSectorTres || esCampusVirtual;
+      return esLugarTres;
     });
 
     console.log(`🎓 Inscriptos de modalidad virtual: ${inscriptosVirtuales.length} de ${todosLosInscriptos.length} totales`);

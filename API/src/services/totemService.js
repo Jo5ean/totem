@@ -85,38 +85,12 @@ class TotemService {
 
   async processTotemDataToExams(sheetData) {
     const createdExams = [];
+    let duplicatesSkipped = 0;
     
     console.log(`🔄 Procesando ${sheetData.length} filas para crear exámenes...`);
     
-    // OPTIMIZACIÓN: Cargar todos los ExamenesTotem existentes en memoria (cache)
-    console.log('📋 Cargando cache de exámenes existentes...');
-    const existingExamesTotem = await prisma.examenTotem.findMany({
-      select: {
-        sectorTotem: true,
-        carreraTotem: true,
-        materiaTotem: true,
-        examenId: true,
-        examen: {
-          select: {
-            id: true,
-            carreraId: true,
-            fecha: true,
-            activo: true
-          }
-        }
-      }
-    });
-    
-    // Crear un Map para búsqueda O(1)
-    const examnesCache = new Map();
-    existingExamesTotem.forEach(et => {
-      if (et.examen) {
-        const key = `${et.sectorTotem}_${et.carreraTotem}_${et.materiaTotem}_${et.examen.carreraId}_${et.examen.fecha.toDateString()}`;
-        examnesCache.set(key, et.examen);
-      }
-    });
-    
-    console.log(`📋 Cache cargado: ${examnesCache.size} exámenes en memoria`);
+    // 🎯 PASO 1: MAPEO COMPLETO PREVIO
+    await this.ensureCompleteMapping(sheetData);
     
     for (const row of sheetData) {
       try {
@@ -150,12 +124,20 @@ class TotemService {
         // 3. Buscar o crear aula si hay información
         const aula = await this.findOrCreateAula(totemData);
 
-        // 4. VERIFICAR DUPLICADOS usando cache (SÚPER RÁPIDO)
-        const cacheKey = `${totemData.sector}_${totemData.carrera}_${totemData.materia}_${carrera.id}_${totemData.fecha.toDateString()}`;
-        const existeExamen = examnesCache.get(cacheKey);
+        // 4. VERIFICAR DUPLICADOS REALES Y PROTEGER AULAS ASIGNADAS
+        const existeExamen = await this.checkExamenDuplicate(totemData, carrera.id);
         if (existeExamen) {
-          console.log(`⚠️  Examen ya existe: ${totemData.sector}/${totemData.carrera}/${totemData.materia} (${totemData.fecha.toDateString()}) - ID: ${existeExamen.id}`);
-          continue; // Skip creating duplicate
+          const horaStr = totemData.hora ? totemData.hora.getHours() + ':' + totemData.hora.getMinutes() : 'sin-hora';
+          
+          // ✅ PROTECCIÓN ESPECIAL: Si el examen ya tiene aula asignada
+          if (existeExamen.aulaId) {
+            console.log(`🔒 EXAMEN PROTEGIDO (CON AULA): ${totemData.sector}/${totemData.carrera}/${totemData.materia} (${totemData.fecha.toDateString()} ${horaStr}) - ID: ${existeExamen.id} - AULA: ${existeExamen.aulaId}`);
+          } else {
+            console.log(`📋 Examen duplicado detectado en BD: ${totemData.sector}/${totemData.carrera}/${totemData.materia} (${totemData.fecha.toDateString()} ${horaStr}) - Docente: ${totemData.docente} - ID: ${existeExamen.id}`);
+          }
+          
+          duplicatesSkipped++;
+          continue; // ❌ NO SOBRESCRIBIR - Preservar examen existente
         }
 
         // 5. Crear examen
@@ -164,9 +146,7 @@ class TotemService {
         // 6. Crear registro de ExamenTotem con datos originales
         await this.createExamenTotemRecord(examen.id, totemData, row);
 
-        // 7. AGREGAR AL CACHE para futuras verificaciones en esta ejecución
-        const newCacheKey = `${totemData.sector}_${totemData.carrera}_${totemData.materia}_${carrera.id}_${totemData.fecha.toDateString()}`;
-        examnesCache.set(newCacheKey, examen);
+        // 7. Examen creado exitosamente
 
         createdExams.push(examen);
 
@@ -175,7 +155,7 @@ class TotemService {
       }
     }
 
-    console.log(`✅ Procesamiento completado: ${createdExams.length} exámenes creados`);
+    console.log(`✅ Procesamiento completado: ${createdExams.length} exámenes creados, ${duplicatesSkipped} duplicados saltados`);
     return createdExams;
   }
 
@@ -398,35 +378,60 @@ class TotemService {
   }
 
   /**
-   * Verifica si ya existe un examen con los mismos datos clave (OPTIMIZADO)
-   * Campos clave: sector + carrera + materia + fecha
+   * Verifica si ya existe un examen con los mismos datos clave (MULTIPLE CAMPOS)
+   * Campos clave: sector + carrera + modo + areaTema + materia + fecha + docente + tipoExamen + url
    */
   async checkExamenDuplicate(totemData, carreraId) {
     try {
-      // Búsqueda optimizada: solo en ExamenTotem con índice en los campos clave
+      // DEBUG: Log para ver qué está buscando
+      console.log(`🔍 Verificando duplicado: ${totemData.sector}/${totemData.carrera}/${totemData.materia} - ${totemData.fecha?.toDateString()}`);
+      
+      // Búsqueda robusta: comparando MÚLTIPLES campos del Google Sheet
       const existingExamenTotem = await prisma.examenTotem.findFirst({
         where: {
           sectorTotem: totemData.sector,
           carreraTotem: totemData.carrera,
-          materiaTotem: totemData.materia
+          materiaTotem: totemData.materia,
+          areaTemaTotem: totemData.areaTema,
+          modoTotem: totemData.modo,
+          docenteTotem: totemData.docente,
+          urlTotem: totemData.url
         },
         select: {
-          examenId: true
+          examenId: true,
+          examen: {
+            select: {
+              id: true,
+              fecha: true,
+              hora: true,
+              tipoExamen: true,
+              carreraId: true,
+              aulaId: true, // ✅ INCLUIR AULA PARA PROTECCIÓN
+              activo: true
+            }
+          }
         }
       });
 
-      // Si existe, verificar que el examen asociado coincida con fecha y carrera
+      // DEBUG: Log resultado de búsqueda
       if (existingExamenTotem) {
-        const examen = await prisma.examen.findFirst({
-          where: {
-            id: existingExamenTotem.examenId,
-            carreraId: carreraId,
-            fecha: totemData.fecha,
-            activo: true
-          }
-        });
+        console.log(`🔴 DUPLICADO ENCONTRADO: ExamenTotem ID ${existingExamenTotem.examenId}`);
+      } else {
+        console.log(`✅ NO ES DUPLICADO - creando nuevo examen`);
+      }
+
+      // Si existe, verificar que el examen asociado coincida con fecha, hora, tipo y carrera
+      if (existingExamenTotem?.examen) {
+        const examen = existingExamenTotem.examen;
+        const fechaCoincide = examen.fecha.toDateString() === totemData.fecha.toDateString();
+        const horaCoincide = examen.hora?.getHours() === totemData.hora?.getHours() && 
+                            examen.hora?.getMinutes() === totemData.hora?.getMinutes();
+        const tipoCoincide = examen.tipoExamen === totemData.tipoExamen;
+        const carreraCoincide = examen.carreraId === carreraId;
         
-        return examen;
+        if (fechaCoincide && horaCoincide && tipoCoincide && carreraCoincide && examen.activo) {
+          return examen;
+        }
       }
 
       return null;
@@ -434,6 +439,93 @@ class TotemService {
       console.error('Error verificando duplicado de examen:', error);
       return null;
     }
+  }
+
+  /**
+   * 🎯 MAPEO COMPLETO PREVIO - Asegura que todo esté mapeado antes de crear exámenes
+   */
+  async ensureCompleteMapping(sheetData) {
+    console.log('🗺️  INICIANDO MAPEO COMPLETO PREVIO...');
+    
+    // 1. EXTRAER TODOS LOS DATOS ÚNICOS
+    const sectoresUnicos = [...new Set(sheetData.map(row => row.SECTOR?.toString().trim()).filter(s => s))];
+    const carrerasUnicas = [...new Set(sheetData.map(row => row.CARRERA?.toString().trim()).filter(c => c))];
+    const aulasUnicas = [...new Set(sheetData.map(row => row.AULA?.toString().trim()).filter(a => a))];
+    
+    console.log(`📊 Detectados: ${sectoresUnicos.length} sectores, ${carrerasUnicas.length} carreras, ${aulasUnicas.length} aulas`);
+    
+    // 2. MAPEAR TODOS LOS SECTORES
+    let sectoresMapeados = 0;
+    for (const sector of sectoresUnicos) {
+      const facultadExistente = await this.mapSectorToFacultad(sector);
+      if (!facultadExistente) {
+        // Crear facultad por defecto si no existe mapeo
+        const nuevaFacultad = await prisma.facultad.create({
+          data: {
+            nombre: `Facultad ${sector}`,
+            codigo: sector.substring(0, 10),
+            activo: true
+          }
+        });
+        
+        await this.createSectorFacultadMapping(sector, nuevaFacultad.id);
+        sectoresMapeados++;
+        console.log(`   🆕 Sector "${sector}" → Nueva Facultad "${nuevaFacultad.nombre}"`);
+      }
+    }
+    
+    // 3. MAPEAR TODAS LAS CARRERAS
+    let carrerasMapeadas = 0;
+    for (const carreraCode of carrerasUnicas) {
+      // Buscar si ya está mapeada
+      const carreraExistente = await prisma.carreraTotem.findUnique({
+        where: { codigoTotem: carreraCode },
+        include: { carrera: true }
+      });
+      
+      if (!carreraExistente || !carreraExistente.esMapeada) {
+        // Crear carrera genérica si no existe
+        const nuevaCarrera = await prisma.carrera.create({
+          data: {
+            nombre: `Carrera ${carreraCode}`,
+            codigo: carreraCode.substring(0, 10),
+            facultadId: 1, // Facultad por defecto
+            activo: true
+          }
+        });
+        
+        await this.mapCarreraTotemToCarrera(carreraCode, nuevaCarrera.id);
+        carrerasMapeadas++;
+        console.log(`   🆕 Carrera "${carreraCode}" → Nueva Carrera "${nuevaCarrera.nombre}"`);
+      }
+    }
+    
+    // 4. CREAR AULAS SI ES NECESARIO
+    let aulasCreadas = 0;
+    for (const aulaInfo of aulasUnicas) {
+      if (aulaInfo && aulaInfo !== 'undefined') {
+        const aulaExistente = await prisma.aula.findFirst({
+          where: { 
+            nombre: { contains: aulaInfo, mode: 'insensitive' }
+          }
+        });
+        
+        if (!aulaExistente) {
+          await prisma.aula.create({
+            data: {
+              nombre: `Aula ${aulaInfo}`,
+              capacidad: 50, // Capacidad por defecto
+              activo: true,
+              tipoAula: 'regular'
+            }
+          });
+          aulasCreadas++;
+          console.log(`   🆕 Aula "${aulaInfo}" creada`);
+        }
+      }
+    }
+    
+    console.log(`✅ MAPEO COMPLETADO: ${sectoresMapeados} sectores, ${carrerasMapeadas} carreras, ${aulasCreadas} aulas`);
   }
 }
 

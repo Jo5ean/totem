@@ -1,154 +1,51 @@
 # Scripts del Sistema TOTEM
 
-Este directorio contiene scripts de configuración y mantenimiento del sistema TOTEM.
+## ✨ WORKFLOW SIMPLIFICADO (NUEVO)
 
-## 🚀 **Inicialización Completa (NUEVO DESARROLLADOR)**
-
-### Para máquinas nuevas o después de `git pull`:
+### 🚀 Script Maestro Unificado - UN SOLO COMANDO:
 
 ```bash
-# 1. Instalar dependencias
-npm install
-
-# 2. Configurar base de datos (archivo .env)
-DATABASE_URL="mysql://usuario:password@localhost:3306/ucasal_cronogramas"
-
-# 3. Ejecutar migraciones de Prisma
-npx prisma migrate dev
-
-# 4. ¡INICIALIZAR SISTEMA COMPLETO!
-node scripts/inicializar-desde-cero.js
+node scripts/totem-master.js
 ```
 
-Este script único hará **TODA** la configuración inicial:
-- ✅ Crea 14 facultades
-- ✅ Crea 90+ carreras (desde CSV o básicas)
-- ✅ Crea 6 aulas iniciales
-- ✅ Crea mapeos sectores ↔ facultades
-- ✅ Crea mapeos carreras ↔ TOTEM
+**Este único script reemplaza TODOS los scripts anteriores y hace:**
+- ✅ Limpieza completa de base de datos
+- ✅ Configuración de **4 aulas exactas** (sin aulas extras)
+- ✅ Mapeo automático de sectores y carreras
+- ✅ Sincronización completa desde Sheet.best
+- ✅ **Corrección de duplicados falsos** (incluye hora + docente)
+- ✅ Reporte final detallado con estadísticas
 
-### Después de la inicialización:
+---
+
+## 📊 Scripts Adicionales
+
+### **`sincronizar-inscriptos-masivo.js`** - Sincronización opcional
+Solo ejecutar después del script maestro si necesitas actualizar cantidades de inscriptos:
 
 ```bash
-# 5. Iniciar servidor API
-npm run dev
-
-# 6. Sincronizar datos desde Google Sheets
-curl -X POST http://localhost:3000/api/v1/totem/sync
+node scripts/sincronizar-inscriptos-masivo.js
 ```
 
-## 📋 **Scripts Disponibles**
-
-### 🏗️ **Configuración Inicial**
-- `inicializar-desde-cero.js` - **PRINCIPAL** - Setup completo para máquinas nuevas
-- `configurar-aulas-iniciales.js` - Solo configuración de aulas
-- `setup-totem-mapeos.js` - Solo mapeos TOTEM
-
-### 🗺️ **Mapeos**
-- `mapear-carreras-automatico.js` - Mapeo automático desde CSV
-
-### 🧹 **Mantenimiento**
-- Archivos temporales eliminados después de cada debugging
-
-## 🎯 **Para Desarrolladores Nuevos**
-
-Si eres un desarrollador nuevo en el proyecto:
-
-1. **Clona el repositorio**
-2. **Ejecuta SOLO estos comandos:**
-   ```bash
-   npm install
-   npx prisma migrate dev
-   node scripts/inicializar-desde-cero.js
-   npm run dev
-   ```
-3. **¡Listo!** El sistema estará funcionando completamente
-
-## ⚠️ **Notas Importantes**
-
-- **NO ejecutes scripts individuales** a menos que sepas exactamente qué hacen
-- **El script `inicializar-desde-cero.js` es idempotente** - puedes ejecutarlo múltiples veces sin problemas
-- **Los CSVs** (`sectores_202506061224.csv`, `Codcar_y_Carrera.csv`) deben estar en la raíz de `/API/`
-- **Si faltan CSVs**, el script creará datos básicos automáticamente
-
-## 🔄 **Sincronización TOTEM**
-
-Después de la inicialización, sincroniza con Google Sheets:
+### **`limpiar-scripts-obsoletos.js`** - Limpieza de archivos
+Elimina todos los scripts obsoletos y mantiene solo los esenciales:
 
 ```bash
-# Sincronización completa
-curl -X POST http://localhost:3000/api/v1/totem/sync
-
-# Verificar mapeos
-curl http://localhost:3000/api/v1/facultades
-
-# Ver exámenes por fecha
-curl "http://localhost:3000/api/v1/examenes/por-fecha?fecha=2025-06-30"
+node scripts/limpiar-scripts-obsoletos.js
 ```
 
-## 🎉 **Resultado Esperado**
-
-Después de ejecutar todo:
-- ~1,305 exámenes (coincide con Google Sheets)
-- 0 duplicados
-- Inscriptos funcionando via API externa
-- Mapeos correctos de sectores/carreras
-
-## 🚀 Setup Rápido (Recomendado)
+### **`limpiar-duplicados-urgente.js`** - 🆕 Solución de duplicados
+Elimina exámenes duplicados existentes en la base de datos:
 
 ```bash
-# 1. Asegúrate de que el servidor esté corriendo
-npm start
-
-# 2. Ejecuta el script maestro (en otra terminal)
-node scripts/setup-completo.js
+node scripts/limpiar-duplicados-urgente.js
 ```
 
-¡Eso es todo! El script maestro ejecutará automáticamente todos los pasos necesarios.
-
-## 📋 Scripts Individuales
-
-Si prefieres ejecutar los scripts uno por uno:
-
-### 1. `configurar-aulas-iniciales.js`
-```bash
-node scripts/configurar-aulas-iniciales.js
-```
-**Qué hace:**
-- Crea las 5 aulas principales del sistema
-- Configura capacidades: Aula 4 (72), Aula 8 (71), Aula 12 (69), Lab Informático (34), Notebooks (26)
-- Establece criterios de asignación automática
-
-### 2. `setup-totem-mapeos.js`
-```bash
-node scripts/setup-totem-mapeos.js
-```
-**Qué hace:**
-- Mapea sectores del TOTEM a facultades
-- Establece relaciones: Sector 2→Economía, Sector 3→Jurídicas, Sector 4→Ingeniería, etc.
-
-### 3. `mapear-carreras-automatico.js`
-```bash
-node scripts/mapear-carreras-automatico.js
-```
-**Qué hace:**
-- Mapea automáticamente ~70 carreras usando datos del CSV oficial
-- Relaciona códigos TOTEM con carreras de la base de datos
-- Actualiza nombres de carreras desde el CSV de UCASAL
-
-### 4. `setup-completo.js` (Script Maestro)
-```bash
-node scripts/setup-completo.js
-```
-**Qué hace:**
-- Ejecuta todos los scripts anteriores en orden
-- Sincroniza datos desde Sheet.best
-- Verifica el estado final del sistema
-- Muestra reporte completo con estadísticas
+---
 
 ## 🔧 Prerrequisitos
 
-Antes de ejecutar cualquier script:
+Antes de ejecutar el script maestro:
 
 1. **MySQL** debe estar corriendo
 2. **Archivo .env** configurado:
@@ -157,101 +54,98 @@ Antes de ejecutar cualquier script:
    NODE_ENV="development"
    PORT=3000
    ```
-3. **Prisma** configurado:
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
-4. **Servidor API** corriendo:
+3. **Servidor API** corriendo:
    ```bash
    npm start
    ```
 
-## 📊 Verificación Post-Setup
+---
 
-Después de ejecutar los scripts, verifica que todo esté correcto:
+## 🚀 Configuración Completa (Paso a Paso)
+
+### Para desarrolladores nuevos o reseteo completo:
 
 ```bash
-# Estadísticas de la base de datos
-curl http://localhost:3000/api/v1/totem/verify-database
+# 1. Instalar dependencias
+npm install
 
-# Estado de mapeos
-curl http://localhost:3000/api/v1/totem/mapeos/carreras
-curl http://localhost:3000/api/v1/totem/mapeos/sectores
-
-# Resumen del dashboard
-curl http://localhost:3000/api/v1/dashboard/resumen
-```
-
-## 🎯 Estado Final Esperado
-
-Después del setup completo deberías tener:
-
-- ✅ **5 aulas** configuradas con sus capacidades
-- ✅ **~37 carreras** mapeadas (de ~38 total)
-- ✅ **Sectores** mapeados a facultades
-- ✅ **~900+ exámenes** sincronizados desde Sheet.best
-- ✅ **Sistema de asignación** listo para funcionar
-
-## ⚠️ Solución de Problemas
-
-### Error: "fetch is not defined"
-El script usa `fetch()` nativo de Node.js 18+. Si usas una versión anterior:
-```bash
-npm install node-fetch
-# Y actualiza los imports en los scripts
-```
-
-### Error: "ECONNREFUSED"
-El servidor no está corriendo:
-```bash
-cd API
-npm start
-```
-
-### Error: "PrismaClientInitializationError"
-Problema con la base de datos:
-```bash
+# 2. Configurar Prisma
 npx prisma generate
 npx prisma db push
+
+# 3. Iniciar servidor API (terminal 1)
+npm start
+
+# 4. Ejecutar script maestro (terminal 2)
+node scripts/totem-master.js
 ```
 
-### Error: "Sheet.best API failed"
-Verifica la URL en el .env o usa curl para probar:
+---
+
+## 📊 Estado Final Esperado
+
+Después del script maestro tendrás:
+
+- ✅ **4 aulas exactas:** Aula 4 (72), Aula 8 (71), Aula 12 (69), Lab Informático (34)
+- ✅ **~37 carreras** mapeadas automáticamente
+- ✅ **7 sectores** mapeados a facultades  
+- ✅ **~1,000+ exámenes** sincronizados (en lugar de 300 descartados)
+- ✅ **0 duplicados falsos** (detección inteligente)
+
+---
+
+## 💡 Ventajas del Nuevo Sistema
+
+✅ **UN SOLO COMANDO** en lugar de 10+ scripts  
+✅ **DETECCIÓN INTELIGENTE** de duplicados (fecha + hora + docente)  
+✅ **4 AULAS EXACTAS** sin aulas innecesarias  
+✅ **REPORTE COMPLETO** con verificaciones automáticas  
+✅ **CORRECCIÓN DE BUGS** anteriores (duplicados falsos)  
+✅ **PORTABILIDAD** mejorada para nuevos desarrolladores  
+
+---
+
+## 🔗 Enlaces Útiles (Post-Setup)
+
+Después de ejecutar el script maestro:
+
+- 📊 **Dashboard:** http://localhost:3000/api/v1/dashboard/resumen
+- 🔍 **Debug BD:** http://localhost:3000/api/v1/totem/verify-database  
+- 🏫 **Aulas:** http://localhost:3000/api/v1/aulas
+- 📚 **Mapeos:** http://localhost:3000/api/v1/totem/mapeos/carreras
+
+---
+
+## 🎯 Próximos Pasos
+
+1. Revisar dashboard para verificar datos
+2. Configurar asignación automática de aulas
+3. Sincronizar cantidad de inscriptos (opcional)
+4. Levantar interfaces web (backoffice/web)
+
+---
+
+## ⚠️ Scripts Obsoletos (YA NO USAR)
+
+Los siguientes scripts fueron **ELIMINADOS** y reemplazados por `totem-master.js`:
+
+~~`inicializar-desde-cero.js`~~ ❌  
+~~`setup-completo.js`~~ ❌  
+~~`configurar-aulas-iniciales.js`~~ ❌  
+~~`mapear-carreras-automatico.js`~~ ❌  
+~~`limpiar-aulas-incorrectas.js`~~ ❌  
+~~Otros 7+ scripts obsoletos~~ ❌
+
+**¡Usa solo `totem-master.js` ahora!**
+
+---
+
+## 🆘 Ayuda
+
 ```bash
-curl "https://sheet.best/api/sheets/TU_SHEET_ID"
-```
+# Ver ayuda del script maestro
+node scripts/totem-master.js --help
 
-## 🔄 Sincronización Continua
-
-Para mantener los datos actualizados, programa la sincronización:
-
-```bash
-# Manual
-curl http://localhost:3000/api/v1/totem/simple-sync
-
-# Automática cada hora (cron)
-0 * * * * curl http://localhost:3000/api/v1/totem/simple-sync
-```
-
-## 📱 Interfaces de Usuario
-
-Una vez configurado el backend, puedes levantar las interfaces:
-
-### Backoffice (Next.js)
-```bash
-cd ../backoffice
-npm install
-npm run dev
-# http://localhost:3001
-```
-
-### Web Pública (Astro)
-```bash
-cd ../web
-npm install
-npm run dev
-# http://localhost:4321
-```
-
-¡Con estos scripts tendrás el sistema TOTEM completamente funcional! 🎉 
+# Limpiar scripts obsoletos
+node scripts/limpiar-scripts-obsoletos.js
+``` 

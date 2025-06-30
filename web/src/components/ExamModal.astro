@@ -71,6 +71,41 @@ const examData = {
   </div>
 </div>
 
+<!-- Modal de Mapa -->
+<div id="mapModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300" style="z-index: 10000;">
+  <div class="bg-white rounded-3xl max-w-4xl w-full shadow-2xl transform scale-95 transition-all duration-300 max-h-[90vh] overflow-y-auto">
+    
+    <!-- Header del mapa -->
+    <div class="bg-gradient-to-r from-purple-600 to-purple-800 text-white p-6 rounded-t-3xl">
+      <div class="flex items-center justify-between">
+        <div class="flex-1">
+          <h2 id="mapTitle" class="text-2xl font-bold">Mapa del Campus</h2>
+          <p id="mapSubtitle" class="text-purple-100 text-lg">Ubicación del aula</p>
+        </div>
+        <button id="closeMapModal" class="text-white/80 hover:text-white transition-colors p-3 hover:bg-white/10 rounded-xl ml-4">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Contenido del mapa -->
+    <div class="p-6">
+      <div id="mapContent" class="text-center">
+        <!-- El mapa se carga aquí dinámicamente -->
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="p-6 border-t border-gray-100 bg-gray-50 rounded-b-3xl">
+      <button id="closeMapModalBtn" class="w-full py-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-xl font-semibold transition-all duration-200 text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02]">
+        Cerrar Mapa
+      </button>
+    </div>
+  </div>
+</div>
+
 <style>
   #examModal {
     z-index: 9999 !important;
@@ -96,10 +131,9 @@ const examData = {
     box-shadow: 0 8px 25px rgba(0,0,0,0.1);
   }
   
-  /* Gradientes personalizados */
+  /* Gradientes personalizados - SIN SOMBRA */
   .subject-badge {
     background: linear-gradient(135deg, #1e40af, #3b82f6);
-    box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3);
   }
   
   /* Responsive */
@@ -206,10 +240,10 @@ const examData = {
             examsList.innerHTML = data.examenes.map((exam: any, index: number) => `
                 <div class="exam-card bg-white border-2 border-gray-100 rounded-2xl p-6 mb-6 shadow-lg ${index > 0 ? 'mt-6' : ''}">
                     
-                    <!-- 1. MATERIA - Elemento más prominente -->
+                    <!-- 1. MATERIA - Elemento más prominente (SIN SOMBRA) -->
                     <div class="text-center mb-6">
-                        <div class="subject-badge inline-block px-6 py-3 rounded-xl text-white shadow-md">
-                            <h3 class="text-gray-800 text-2xl font-bold leading-tight">${exam.materia || 'Materia no especificada'}</h3>
+                        <div class="subject-badge inline-block px-6 py-3 rounded-xl">
+                            <h3 class="text-2xl font-bold leading-tight">${exam.materia || 'Materia no especificada'}</h3>
                         </div>
                     </div>
                     
@@ -251,15 +285,16 @@ const examData = {
                             <p class="text-lg font-bold text-gray-800">${exam.fecha || 'Fecha no especificada'}</p>
                         </div>
                         
-                        <!-- CÁTEDRA/PROFESOR -->
-                        <div class="bg-purple-50 border border-purple-200 p-4 rounded-xl text-center">
+                        <!-- MAPA -->
+                        <div class="bg-purple-50 border border-purple-200 p-4 rounded-xl text-center cursor-pointer hover:bg-purple-100 transition-colors" onclick="mostrarMapa('${exam.aula}')">
                             <div class="flex items-center justify-center mb-2">
                                 <svg class="w-5 h-5 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                 </svg>
-                                <span class="text-sm font-semibold text-purple-700 uppercase tracking-wide">CÁTEDRA</span>
+                                <span class="text-sm font-semibold text-purple-700 uppercase tracking-wide">MAPA</span>
                             </div>
-                            <p class="text-lg font-bold text-gray-800">${exam.profesor || 'No especificado'}</p>
+                            <p class="text-lg font-bold text-gray-800">${exam.aula ? 'Ver ubicación' : 'Sin asignar'}</p>
                         </div>
                     </div>
                     
@@ -280,15 +315,105 @@ const examData = {
         }
     }
 
-    // Event listeners cuando el DOM esté listo
+
+
+    // Función para mostrar mapa según el aula
+    function mostrarMapa(aula: string | null) {
+        if (!aula || aula === 'null' || aula === 'Sin asignar') {
+            alert('No hay aula asignada para mostrar en el mapa');
+            return;
+        }
+        
+        const mapModal = document.getElementById('mapModal');
+        const mapTitle = document.getElementById('mapTitle');
+        const mapSubtitle = document.getElementById('mapSubtitle');
+        const mapContent = document.getElementById('mapContent');
+        
+        if (!mapModal || !mapTitle || !mapSubtitle || !mapContent) {
+            console.error('Elementos del modal de mapa no encontrados');
+            return;
+        }
+        
+        // Determinar qué mapa mostrar según el aula
+        let imagenMapa = '';
+        let tituloMapa = '';
+        let ubicacionMapa = '';
+        
+        // MAPEO CORRECTO: Primer Piso vs Planta Baja
+        const aulaStr = aula.toString().toUpperCase();
+        const esPrimerPiso = aulaStr.includes('4') || 
+                           aulaStr.includes('8') || 
+                           aulaStr.includes('LAB') || 
+                           aulaStr.includes('LABORATORIO');
+        
+        if (esPrimerPiso) {
+            // Aulas del primer piso: 4, 8, Laboratorio
+            imagenMapa = '/images/primerPiso.jpg';
+            tituloMapa = 'Mapa del Campus - Primer Piso';
+            ubicacionMapa = 'Primer Piso';
+        } else {
+            // Todas las demás aulas están en planta baja
+            imagenMapa = '/images/plantaBaja.jpg';
+            tituloMapa = 'Mapa del Campus - Planta Baja';
+            ubicacionMapa = 'Planta Baja';
+        }
+        
+        // Actualizar contenido del modal
+        mapTitle.textContent = tituloMapa;
+        mapSubtitle.textContent = `${aula} - ${ubicacionMapa}`;
+        
+        mapContent.innerHTML = `
+            <div class="bg-gray-50 p-4 rounded-xl mb-4">
+                <p class="text-lg font-semibold text-gray-800 mb-2">📍 Ubicación: ${aula}</p>
+                <p class="text-gray-600">${ubicacionMapa}</p>
+            </div>
+            
+            <div class="border-2 border-gray-200 rounded-xl overflow-hidden shadow-lg">
+                <img 
+                    src="${imagenMapa}" 
+                    alt="Mapa de ${tituloMapa}" 
+                    class="w-full h-auto max-h-96 object-contain bg-white"
+                    onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjIwMCIgeT0iMTUwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNkI3MjgwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiPk1hcGEgbm8gZGlzcG9uaWJsZTwvdGV4dD4KPHRleHQgeD0iMjAwIiB5PSIxODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2QjcyODAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCI+U3ViZSBsYSBpbWFnZW4gYSAvd2ViL3B1YmxpYy9pbWFnZXMvPC90ZXh0Pgo8L3N2Zz4K'; this.onerror=null;"
+                />
+            </div>
+            
+            <div class="mt-4 text-sm text-gray-600">
+                <p><strong>💡 Instrucciones:</strong></p>
+                <p>• Busca la zona marcada con "${aula}" en el mapa</p>
+                <p>• Pregunta al personal si necesitas orientación adicional</p>
+            </div>
+        `;
+        
+        // Mostrar modal
+        mapModal.classList.add('modal-open');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    // Función para cerrar modal de mapa
+    function closeMapModal() {
+        const mapModal = document.getElementById('mapModal');
+        mapModal?.classList.remove('modal-open');
+        document.body.style.overflow = 'auto';
+    }
+
+    // Event listeners cuando el DOM esté listo (UNIFICADO)
     document.addEventListener('DOMContentLoaded', function() {
         const closeModalBtn = document.getElementById('closeModal');
         const closeModalFooter = document.getElementById('closeModalBtn');
         const modal = document.getElementById('examModal');
+        
+        // Modal de mapa
+        const closeMapModalBtn = document.getElementById('closeMapModal');
+        const closeMapModalFooter = document.getElementById('closeMapModalBtn');
+        const mapModal = document.getElementById('mapModal');
 
         // Event listeners para el modal principal
         closeModalBtn?.addEventListener('click', closeModal);
         closeModalFooter?.addEventListener('click', closeModal);
+        
+        // Event listeners para el modal de mapa
+        closeMapModalBtn?.addEventListener('click', closeMapModal);
+        closeMapModalFooter?.addEventListener('click', closeMapModal);
         
         // Cerrar modal al hacer click en el fondo
         modal?.addEventListener('click', function(e) {
@@ -297,18 +422,35 @@ const examData = {
             }
         });
         
+        mapModal?.addEventListener('click', function(e) {
+            if (e.target === mapModal) {
+                closeMapModal();
+            }
+        });
+        
         // Cerrar modal con tecla Escape
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                closeModal();
+                const mapModalOpen = mapModal?.classList.contains('modal-open');
+                const examModalOpen = modal?.classList.contains('modal-open');
+                
+                if (mapModalOpen) {
+                    closeMapModal();
+                } else if (examModalOpen) {
+                    closeModal();
+                }
             }
         });
     });
+
+    // Hacer función mostrarMapa global
+    (window as any).mostrarMapa = mostrarMapa;
 
     // Exportar funciones para que puedan ser usadas desde otras secciones
     (window as any).ExamModal = {
         openExamModal,
         closeModal,
-        setCurrentExamData: (data: any) => { currentExamData = data; }
+        setCurrentExamData: (data: any) => { currentExamData = data; },
+        mostrarMapa
     };
 </script> 

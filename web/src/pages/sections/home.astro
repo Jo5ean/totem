@@ -228,26 +228,28 @@ import ExamModal from '../../components/ExamModal.astro';
             }
         }
         
-        // Función auxiliar para formatear fechas
+        // Función auxiliar para formatear fechas (CORREGIDO: usar UTC para evitar problemas de zona horaria)
         function formatearFecha(fecha: string | null): string {
             if (!fecha) return 'Fecha no especificada';
             
             try {
-                const fechaObj = new Date(fecha);
+                // Usar UTC para evitar problemas de zona horaria
+                const fechaObj = new Date(fecha + 'T00:00:00.000Z');
                 const hoy = new Date();
-                const manana = new Date(hoy);
-                manana.setDate(hoy.getDate() + 1);
+                const hoyUTC = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+                const manana = new Date(hoyUTC);
+                manana.setDate(hoyUTC.getDate() + 1);
                 
                 const fechaStr = fechaObj.toISOString().split('T')[0];
-                const hoyStr = hoy.toISOString().split('T')[0];
+                const hoyStr = hoyUTC.toISOString().split('T')[0];
                 const mananaStr = manana.toISOString().split('T')[0];
                 
                 if (fechaStr === hoyStr) {
-                    return `Hoy - ${fechaObj.getDate()} ${obtenerNombreMes(fechaObj.getMonth())}`;
+                    return `Hoy - ${fechaObj.getUTCDate()} ${obtenerNombreMes(fechaObj.getUTCMonth())}`;
                 } else if (fechaStr === mananaStr) {
-                    return `Mañana - ${fechaObj.getDate()} ${obtenerNombreMes(fechaObj.getMonth())}`;
+                    return `Mañana - ${fechaObj.getUTCDate()} ${obtenerNombreMes(fechaObj.getUTCMonth())}`;
                 } else {
-                    return `${fechaObj.getDate()} ${obtenerNombreMes(fechaObj.getMonth())} ${fechaObj.getFullYear()}`;
+                    return `${fechaObj.getUTCDate()} ${obtenerNombreMes(fechaObj.getUTCMonth())} ${fechaObj.getUTCFullYear()}`;
                 }
             } catch (error) {
                 return fecha;
