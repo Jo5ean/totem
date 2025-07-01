@@ -315,8 +315,6 @@ const examData = {
         }
     }
 
-
-
     // Función para mostrar mapa según el aula
     function mostrarMapa(aula: string | null) {
         if (!aula || aula === 'null' || aula === 'Sin asignar') {
@@ -348,12 +346,12 @@ const examData = {
         
         if (esPrimerPiso) {
             // Aulas del primer piso: 4, 8, Laboratorio
-            imagenMapa = '/images/primerPiso.jpg';
+            imagenMapa = './images/primerPiso.jpg';
             tituloMapa = 'Mapa del Campus - Primer Piso';
             ubicacionMapa = 'Primer Piso';
         } else {
-            // Todas las demás aulas están en planta baja
-            imagenMapa = '/images/plantaBaja.jpg';
+            // Aulas de planta baja: 12
+            imagenMapa = './images/plantaBaja.jpg';
             tituloMapa = 'Mapa del Campus - Planta Baja';
             ubicacionMapa = 'Planta Baja';
         }
