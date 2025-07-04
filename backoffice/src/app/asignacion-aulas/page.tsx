@@ -1,7 +1,6 @@
-/// <reference types="react" />
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface Examen {
   id: number;
@@ -41,7 +40,7 @@ export default function AsignacionAulasPage() {
   const [procesando, setProcesando] = useState(false);
   const [examenSeleccionado, setExamenSeleccionado] = useState<Examen | null>(null);
   const [aulaSeleccionada, setAulaSeleccionada] = useState<number | null>(null);
-  const [inscriptos, setInscriptos] = useState<any[]>([]);
+  const [inscriptos, setInscriptos] = useState<Array<{ dni: string; nombre: string; apellido: string }>>([]);
   const [mostrarModal, setMostrarModal] = useState(false);
 
 
@@ -51,21 +50,21 @@ export default function AsignacionAulasPage() {
       setLoading(true);
       
       // Cargar exámenes sin aula y con aula asignada
-      const [responseSinAula, responseAsignados] = await Promise.all([
-        fetch('http://localhost:3000/api/v1/examenes/por-fecha?soloSinAula=true'),
-        fetch('http://localhost:3000/api/v1/examenes/por-fecha?soloConAula=true')
+      const [examenesData, examenesConAulaData] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://totem-api-production.up.railway.app'}/examenes/por-fecha?soloSinAula=true`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://totem-api-production.up.railway.app'}/examenes/por-fecha?soloConAula=true`)
       ]);
       
       const [dataSinAula, dataAsignados] = await Promise.all([
-        responseSinAula.json(),
-        responseAsignados.json()
+        examenesData.json(),
+        examenesConAulaData.json()
       ]);
       
       if (dataSinAula.success) {
         // Mapear exámenes sin aula
         const examenesSinAula: { [fecha: string]: Examen[] } = {};
         Object.entries(dataSinAula.data.examenesPorFecha).forEach(([fecha, examenes]) => {
-          examenesSinAula[fecha] = (examenes as any[]).map(examen => ({
+          examenesSinAula[fecha] = (examenes as Array<any>).map((examen: any) => ({
             id: examen.id,
             nombre: examen.nombre,
             hora: examen.hora,
@@ -84,7 +83,7 @@ export default function AsignacionAulasPage() {
         // Mapear exámenes con aula asignada
         const examenesConAula: { [fecha: string]: Examen[] } = {};
         Object.entries(dataAsignados.data.examenesPorFecha).forEach(([fecha, examenes]) => {
-          examenesConAula[fecha] = (examenes as any[]).map(examen => ({
+          examenesConAula[fecha] = (examenes as Array<any>).map((examen: any) => ({
             id: examen.id,
             nombre: examen.nombre,
             hora: examen.hora,
@@ -125,7 +124,7 @@ export default function AsignacionAulasPage() {
   const obtenerInscriptos = async (examen: Examen) => {
     try {
       setProcesando(true);
-      const response = await fetch(`http://localhost:3000/api/v1/examenes/${examen.id}/inscripciones`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://totem-api-production.up.railway.app'}/examenes/${examen.id}/inscripciones`);
       const data = await response.json();
       
       if (data.success || data.data) {
@@ -177,7 +176,7 @@ export default function AsignacionAulasPage() {
       // Asignación directa con todos los inscriptos
       const observacionesExtra = `Asignación: ${inscriptos.length} inscriptos`;
       
-      const response = await fetch(`http://localhost:3000/api/v1/examenes/${examenId}/asignar-aula`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://totem-api-production.up.railway.app'}/examenes/${examenId}/asignar-aula`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +190,7 @@ export default function AsignacionAulasPage() {
       const data = await response.json();
       
       if (data.success) {
-        const { aulaNueva, inscriptosAsignados, resumenUso } = data.data.asignacion;
+        const { aulaNueva } = data.data.asignacion;
         
         // Actualizar el examen seleccionado con el aula asignada
         if (examenSeleccionado) {
@@ -237,19 +236,19 @@ export default function AsignacionAulasPage() {
 
   useEffect(() => {
     cargarExamenes();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Obtener estadísticas
   const obtenerEstadisticas = () => {
     const examenesDelDia = examenesPorFecha[fechaSeleccionada] || [];
     return {
       totalExamenes: examenesDelDia.length,
-      porFacultad: examenesDelDia.reduce((acc: any, examen) => {
+      porFacultad: examenesDelDia.reduce((acc: Record<string, number>, examen) => {
         const facultad = examen.carrera.facultad;
         acc[facultad] = (acc[facultad] || 0) + 1;
         return acc;
       }, {}),
-      porHora: examenesDelDia.reduce((acc: any, examen) => {
+      porHora: examenesDelDia.reduce((acc: Record<string, number>, examen) => {
         const hora = examen.hora || 'Sin hora';
         acc[hora] = (acc[hora] || 0) + 1;
         return acc;

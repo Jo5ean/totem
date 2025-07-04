@@ -49,7 +49,21 @@ const examData = {
             <p id="studentCareer" class="text-sm font-medium">-</p>
           </div>
         </div>
-        <button id="closeModal" class="text-white/80 hover:text-white transition-colors p-3 hover:bg-white/10 rounded-xl ml-4">
+        
+        <!-- Indicador de timer -->
+        <div class="flex flex-col items-center mr-4">
+          <div id="timerIndicator" class="hidden text-white/70 text-xs mb-2 flex items-center">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span id="timerText">Se cierra en 15s</span>
+          </div>
+          <div id="timerProgress" class="hidden w-16 h-1 bg-white/20 rounded-full overflow-hidden">
+            <div id="timerBar" class="h-full bg-white/60 rounded-full transition-all duration-1000 ease-linear" style="width: 100%"></div>
+          </div>
+        </div>
+        
+        <button id="closeModal" class="text-white/80 hover:text-white transition-colors p-3 hover:bg-white/10 rounded-xl">
           <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
           </svg>
@@ -147,17 +161,86 @@ const examData = {
 <script>
     // Variables globales para los modales
     let currentExamData: any = null;
+    let autoCloseTimer: NodeJS.Timeout | null = null; // Timer para auto-cerrar modal
+    let countdownInterval: NodeJS.Timeout | null = null; // Interval para actualizar el countdown visual
+
+    // Función para manejar el countdown visual
+    function startCountdownDisplay() {
+        const timerIndicator = document.getElementById('timerIndicator');
+        const timerProgress = document.getElementById('timerProgress');
+        const timerText = document.getElementById('timerText');
+        const timerBar = document.getElementById('timerBar');
+        
+        if (!timerIndicator || !timerProgress || !timerText || !timerBar) return;
+        
+        // Mostrar indicadores
+        timerIndicator.classList.remove('hidden');
+        timerProgress.classList.remove('hidden');
+        
+        let secondsLeft = 15;
+        
+        // Actualizar cada segundo
+        countdownInterval = setInterval(() => {
+            secondsLeft--;
+            
+            if (timerText) {
+                timerText.textContent = `Se cierra en ${secondsLeft}s`;
+            }
+            
+            if (timerBar) {
+                const progressPercent = (secondsLeft / 15) * 100;
+                timerBar.style.width = `${progressPercent}%`;
+            }
+            
+            if (secondsLeft <= 0) {
+                clearInterval(countdownInterval!);
+                countdownInterval = null;
+            }
+        }, 1000);
+    }
+    
+    function stopCountdownDisplay() {
+        const timerIndicator = document.getElementById('timerIndicator');
+        const timerProgress = document.getElementById('timerProgress');
+        
+        // Ocultar indicadores
+        timerIndicator?.classList.add('hidden');
+        timerProgress?.classList.add('hidden');
+        
+        // Cancelar interval
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
+    }
 
     // Funciones del modal
     function openExamModal() {
         console.log('Abriendo modal con datos:', currentExamData);
         const modal = document.getElementById('examModal');
         if (modal && currentExamData) {
+            // Cancelar timers anteriores si existen
+            if (autoCloseTimer) {
+                clearTimeout(autoCloseTimer);
+            }
+            stopCountdownDisplay(); // Limpiar countdown anterior
+            
             populateModal(currentExamData);
             modal.classList.add('modal-open');
             
             // Bloquear scroll cuando el modal esté abierto
             document.body.style.overflow = 'hidden';
+            
+            // ⏱️ INICIAR TIMER DE AUTO-CERRAR (15 segundos)
+            autoCloseTimer = setTimeout(() => {
+                console.log('⏰ Auto-cerrando modal después de 15 segundos');
+                closeModal();
+            }, 15000); // 15 segundos
+            
+            // ✨ INICIAR COUNTDOWN VISUAL
+            startCountdownDisplay();
+            
+            console.log('✅ Modal abierto con timer de 15 segundos activado');
         } else {
             console.error('Modal element o datos no encontrados!');
         }
@@ -166,6 +249,21 @@ const examData = {
     function closeModal() {
         const modal = document.getElementById('examModal');
         modal?.classList.remove('modal-open');
+        
+        // 🛑 CANCELAR TIMER DE AUTO-CERRAR Y COUNTDOWN VISUAL
+        if (autoCloseTimer) {
+            clearTimeout(autoCloseTimer);
+            autoCloseTimer = null;
+            console.log('✅ Timer de auto-cerrar cancelado');
+        }
+        stopCountdownDisplay();
+        
+        // 🧹 LIMPIAR INPUT DNI AUTOMÁTICAMENTE
+        const dniInput = document.getElementById('dniInput') as HTMLInputElement;
+        if (dniInput) {
+            dniInput.value = '';
+            console.log('✅ Input DNI limpiado automáticamente');
+        }
         
         // Desbloquear scroll
         document.body.style.overflow = 'auto';
@@ -361,16 +459,11 @@ const examData = {
         mapSubtitle.textContent = `${aula} - ${ubicacionMapa}`;
         
         mapContent.innerHTML = `
-            <div class="bg-gray-50 p-4 rounded-xl mb-4">
-                <p class="text-lg font-semibold text-gray-800 mb-2">📍 Ubicación: ${aula}</p>
-                <p class="text-gray-600">${ubicacionMapa}</p>
-            </div>
-            
             <div class="border-2 border-gray-200 rounded-xl overflow-hidden shadow-lg">
                 <img 
                     src="${imagenMapa}" 
                     alt="Mapa de ${tituloMapa}" 
-                    class="w-full h-auto max-h-96 object-contain bg-white"
+                    class="w-full h-auto max-h-96 object-cover bg-white"
                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMCAwIDQwMCAzMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iMzAwIiBmaWxsPSIjRjNGNEY2Ii8+Cjx0ZXh0IHg9IjIwMCIgeT0iMTUwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjNkI3MjgwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiPk1hcGEgbm8gZGlzcG9uaWJsZTwvdGV4dD4KPHRleHQgeD0iMjAwIiB5PSIxODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM2QjcyODAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCI+U3ViZSBsYSBpbWFnZW4gYSAvd2ViL3B1YmxpYy9pbWFnZXMvPC90ZXh0Pgo8L3N2Zz4K'; this.onerror=null;"
                 />
             </div>
@@ -387,11 +480,13 @@ const examData = {
         document.body.style.overflow = 'hidden';
     }
     
-    // Función para cerrar modal de mapa
+    // Función para cerrar modal de mapa (SIN afectar el timer del modal principal)
     function closeMapModal() {
         const mapModal = document.getElementById('mapModal');
         mapModal?.classList.remove('modal-open');
         document.body.style.overflow = 'auto';
+        
+        // NOTA: No limpiamos el input DNI aquí porque el modal principal sigue abierto
     }
 
     // Event listeners cuando el DOM esté listo (UNIFICADO)

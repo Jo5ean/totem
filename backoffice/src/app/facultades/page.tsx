@@ -175,7 +175,7 @@ export default function FacultadesPage() {
                   <span className="text-sm text-gray-600">Carreras</span>
                 </div>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {facultad._count.carreras}
+                  {facultad._count?.carreras || 0}
                 </span>
               </div>
 
@@ -185,7 +185,7 @@ export default function FacultadesPage() {
                   <span className="text-sm text-gray-600">Sincronizaciones</span>
                 </div>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  {facultad._count.syncLogs}
+                  {facultad._count?.syncLogs || 0}
                 </span>
               </div>
             </div>
