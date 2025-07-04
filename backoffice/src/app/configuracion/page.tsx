@@ -51,7 +51,7 @@ export default function ConfiguracionPage() {
   const configuraciones = [
     {
       titulo: 'URL de la API',
-      valor: process.env.NEXT_PUBLIC_API_URL || 'https://totem-api-production.up.railway.app',
+      valor: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1',
       descripcion: 'Dirección base de la API del sistema TOTEM'
     },
     {
@@ -111,7 +111,7 @@ export default function ConfiguracionPage() {
                 </span>
               </div>
               <div className="text-sm text-gray-500">
-                {process.env.NEXT_PUBLIC_API_URL || 'https://totem-api-production.up.railway.app'}
+                {process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}
               </div>
             </div>
             <button

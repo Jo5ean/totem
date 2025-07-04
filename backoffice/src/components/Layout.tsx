@@ -23,8 +23,8 @@ const navigation = [
   { name: 'Facultades', href: '/facultades', icon: BuildingOfficeIcon },
   { name: 'Mapeos Sectores', href: '/mapeos-sectores', icon: ArrowPathIcon },
   { name: 'Mapeos Carreras', href: '/mapeos-carreras', icon: DocumentTextIcon },
-  { name: 'Estadísticas', href: '/estadisticas', icon: ChartBarIcon, disabled: true },
-  { name: 'Datos TOTEM', href: '/datos-totem', icon: DocumentTextIcon, disabled: true },
+  { name: 'Estadísticas', href: '/estadisticas', icon: ChartBarIcon },
+  { name: 'Datos TOTEM', href: '/datos-totem', icon: DocumentTextIcon },
   { name: 'Config. Visual', href: '/configuracion-visual', icon: Cog6ToothIcon },
   { name: 'Configuración', href: '/configuracion', icon: Cog6ToothIcon },
 ];
@@ -111,24 +111,6 @@ export default function Layout({ children }: LayoutProps) {
           <nav className="flex-1 px-2 py-4 space-y-1">
             {navigation.map((item) => {
               const isActive = pathname === item.href;
-              const isDisabled = item.disabled;
-              
-              if (isDisabled) {
-                return (
-                  <div
-                    key={item.name}
-                    className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-400 cursor-not-allowed opacity-50"
-                    title="Funcionalidad en desarrollo"
-                  >
-                    <item.icon className="mr-3 h-5 w-5 text-gray-300" />
-                    {item.name}
-                    <span className="ml-auto text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded">
-                      Próximamente
-                    </span>
-                  </div>
-                );
-              }
-              
               return (
                 <Link
                   key={item.name}
