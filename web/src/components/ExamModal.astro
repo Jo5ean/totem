@@ -59,6 +59,21 @@ const examData = {
 
     <!-- Lista de exámenes optimizada para escaneo rápido -->
     <div class="p-6" id="examsList">
+      <!-- Indicador de múltiples exámenes (se muestra dinámicamente) -->
+      <div id="multipleExamsIndicator" class="hidden mb-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl">
+        <div class="flex items-center space-x-3">
+          <div class="flex-shrink-0">
+            <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14-4l2 2-2 2M5 13l-2-2 2-2m6 6V7"></path>
+            </svg>
+          </div>
+          <div>
+            <h4 class="text-lg font-bold text-indigo-800 mb-1">🎯 Múltiples Exámenes Encontrados</h4>
+            <p class="text-sm text-indigo-700">Los exámenes están <strong>ordenados cronológicamente</strong> - el más próximo aparece primero.</p>
+          </div>
+        </div>
+      </div>
+      
       <!-- Los exámenes se insertan dinámicamente aquí -->
     </div>
 
@@ -70,7 +85,7 @@ const examData = {
           <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-          <span class="text-sm font-medium">Este modal se cerrará automáticamente en <span id="countdown">15</span> segundos</span>
+          <span class="text-sm font-medium">Este modal se cerrará automáticamente en <span id="countdown">20</span> segundos</span>
         </div>
       </div>
       
@@ -159,7 +174,7 @@ const examData = {
     let currentExamData: any = null;
     let modalAutoCloseTimer: number | null = null;
     let countdownTimer: number | null = null;
-    let countdownSeconds = 15;
+    let countdownSeconds = 20;
 
     // Funciones del modal
     function openExamModal() {
@@ -172,16 +187,16 @@ const examData = {
             // Bloquear scroll cuando el modal esté abierto
             document.body.style.overflow = 'hidden';
             
-            // 🕐 Configurar auto-close después de 15 segundos
+            // 🕐 Configurar auto-close después de 20 segundos
             modalAutoCloseTimer = window.setTimeout(() => {
-                console.log('⏰ Auto-cerrando modal después de 15 segundos');
+                console.log('⏰ Auto-cerrando modal después de 20 segundos');
                 closeModal();
-            }, 15000);
+            }, 20000);
             
             // 📊 Mostrar indicador de countdown
             iniciarCountdown();
             
-            console.log('⏰ Modal se cerrará automáticamente en 15 segundos');
+            console.log('⏰ Modal se cerrará automáticamente en 20 segundos');
         } else {
             console.error('Modal element o datos no encontrados!');
         }
@@ -263,7 +278,7 @@ const examData = {
     
     // 📊 Función para iniciar el countdown visual
     function iniciarCountdown() {
-        countdownSeconds = 15;
+        countdownSeconds = 20;
         const autoCloseIndicator = document.getElementById('autoCloseIndicator');
         const countdownElement = document.getElementById('countdown');
         
@@ -339,12 +354,39 @@ const examData = {
             studentCareer.textContent = carreraFormateada;
         }
         
-        // Generar lista de exámenes con diseño optimizado
+        // Mostrar indicador de múltiples exámenes si corresponde
+        const multipleExamsIndicator = document.getElementById('multipleExamsIndicator');
+        if (multipleExamsIndicator && data.examenes && data.examenes.length > 1) {
+            // Actualizar el texto con la cantidad exacta
+            const headerText = multipleExamsIndicator.querySelector('h4');
+            if (headerText) {
+                headerText.innerHTML = `🎯 ${data.examenes.length} Exámenes Encontrados`;
+            }
+            multipleExamsIndicator.classList.remove('hidden');
+        } else if (multipleExamsIndicator) {
+            multipleExamsIndicator.classList.add('hidden');
+        }
+        
+        // Generar lista de exámenes con diseño optimizado y numeración
         const examsList = document.getElementById('examsList');
         
         if (examsList && data.examenes) {
             examsList.innerHTML = data.examenes.map((exam: any, index: number) => `
-                <div class="exam-card bg-white border-2 border-gray-100 rounded-2xl p-6 mb-6 shadow-lg ${index > 0 ? 'mt-6' : ''}">
+                <div class="exam-card bg-white border-2 ${index === 0 && data.examenes.length > 1 ? 'border-green-300 bg-green-50' : 'border-gray-100'} rounded-2xl p-6 mb-6 shadow-lg ${index > 0 ? 'mt-6' : ''} relative">
+                    
+                    ${data.examenes.length > 1 ? `
+                    <!-- Indicador de posición -->
+                    <div class="absolute -top-3 -left-3 ${index === 0 ? 'bg-green-500' : 'bg-blue-500'} text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold shadow-lg">
+                        ${index + 1}
+                    </div>
+                    
+                    ${index === 0 ? `
+                    <!-- Indicador "MÁS PRÓXIMO" -->
+                    <div class="absolute -top-3 -right-3 bg-gradient-to-r from-green-500 to-green-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg animate-pulse">
+                        ⚡ MÁS PRÓXIMO
+                    </div>
+                    ` : ''}
+                    ` : ''}
                     
                     <!-- 1. MATERIA - Elemento más prominente (SIN SOMBRA) -->
                     <div class="text-center mb-6">
@@ -464,11 +506,6 @@ const examData = {
         mapSubtitle.textContent = `Aula ${aula} - ${ubicacionMapa}`;
         
         mapContent.innerHTML = `
-            <div class="bg-gray-50 p-4 rounded-xl mb-4">
-                <p class="text-lg font-semibold text-gray-800 mb-2">📍 Ubicación: Aula ${aula}</p>
-                <p class="text-gray-600">${ubicacionMapa}</p>
-            </div>
-            
             <div class="border-2 border-gray-200 rounded-xl overflow-hidden shadow-lg">
                 <img 
                     src="${imagenMapa}" 

@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://totem-api-production.up.railway.app/api/v1';
 
 class ApiClient {
   private baseUrl: string;
@@ -68,8 +68,6 @@ export const apiClient = new ApiClient();
 export const totemApi = {
   // Dashboard y estadísticas
   getEstadisticas: () => apiClient.get('/totem/estadisticas'),
-  getEstadisticasLite: () => apiClient.get('/totem/estadisticas-lite'), // Versión ligera
-  getEstadisticasSimple: () => apiClient.get('/totem/estadisticas-simple'), // Versión depuración
   
   // Sincronización
   sincronizar: () => apiClient.post('/totem/sync'),

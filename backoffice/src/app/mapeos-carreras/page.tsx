@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { totemApi, MapeoCarrera, Carrera } from '@/lib/api';
+import { totemApi, MapeoCarrera } from '@/lib/api';
 import { showSuccess, showError } from '@/lib/toast';
 import { 
   DocumentTextIcon,
@@ -12,7 +12,7 @@ import {
 
 export default function MapeosCarrerasPage() {
   const [mapeos, setMapeos] = useState<MapeoCarrera[]>([]);
-  const [carreras, setCarreras] = useState<Carrera[]>([]);
+  // const [carreras, setCarreras] = useState<Carrera[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState<'todas' | 'mapeadas' | 'no-mapeadas'>('todas');
 
@@ -29,16 +29,16 @@ export default function MapeosCarrerasPage() {
     }
   };
 
-  const crearMapeo = async (codigoTotem: string, carreraId: number) => {
-    try {
-      await totemApi.crearMapeoCarrera({ codigoTotem, carreraId });
-      showSuccess('Mapeo creado exitosamente');
-      await cargarDatos();
-    } catch (error) {
-      showError('Error creando mapeo');
-      console.error(error);
-    }
-  };
+  // const crearMapeo = async (codigoTotem: string, carreraId: number) => {
+  //   try {
+  //     await totemApi.crearMapeoCarrera({ codigoTotem, carreraId });
+  //     showSuccess('Mapeo creado exitosamente');
+  //     await cargarDatos();
+  //   } catch (error) {
+  //     showError('Error creando mapeo');
+  //     console.error(error);
+  //   }
+  // };
 
   const mapeosFiltrados = mapeos.filter((mapeo) => {
     if (filtro === 'mapeadas') return mapeo.esMapeada;

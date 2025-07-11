@@ -62,7 +62,7 @@ export default function ConfiguracionVisualPage() {
   };
 
   const previsualizarSitio = () => {
-    window.open('http://localhost:4321', '_blank');
+            window.open('https://wwwold.ucasal.edu.ar/proyectos-innovalab/web/', '_blank');
   };
 
   useEffect(() => {

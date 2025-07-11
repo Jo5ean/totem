@@ -12,7 +12,6 @@ import {
   DocumentTextIcon,
   Bars3Icon,
   XMarkIcon,
-  CalendarIcon,
   AcademicCapIcon
 } from '@heroicons/react/24/outline';
 import clsx from 'clsx';

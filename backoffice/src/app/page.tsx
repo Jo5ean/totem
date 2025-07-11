@@ -19,20 +19,13 @@ export default function Dashboard() {
   const cargarEstadisticas = async () => {
     try {
       setLoading(true);
-      // Usar versión simple para depuración
-      const response = await totemApi.getEstadisticasSimple() as { data: EstadisticasTotem };
+      // Usar endpoint principal de estadísticas
+      const response = await totemApi.getEstadisticas() as { data: EstadisticasTotem };
       setEstadisticas(response.data);
 
     } catch (error) {
-      // Si falla la versión simple, intentar con la ligera
-      try {
-        console.warn('Versión simple falló, intentando con versión ligera...');
-        const response = await totemApi.getEstadisticasLite() as { data: EstadisticasTotem };
-        setEstadisticas(response.data);
-      } catch (fallbackError) {
-        showError('Error cargando estadísticas. Verifique la conexión con la base de datos.');
-        console.error('Error cargando estadísticas:', fallbackError);
-      }
+      showError('Error cargando estadísticas. Verifique la conexión con la base de datos.');
+      console.error('Error cargando estadísticas:', error);
     } finally {
       setLoading(false);
     }
@@ -94,21 +87,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Mensaje informativo sobre versión ligera */}
-      {estadisticas && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <div className="flex items-center">
-            <ChartBarIcon className="h-5 w-5 text-blue-600 mr-2" />
-            <div>
-              <h4 className="text-sm font-medium text-blue-800">Modo de vista optimizada</h4>
-              <p className="text-sm text-blue-700">
-                Se está mostrando una vista optimizada de las estadísticas para mejorar el rendimiento.
-                Algunas listas detalladas pueden no estar disponibles temporalmente.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Estadísticas principales */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

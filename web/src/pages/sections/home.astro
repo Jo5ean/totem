@@ -315,7 +315,40 @@ import ExamModal from '../../components/ExamModal.astro';
                     return { found: false };
                 }
                 
-                // Transformar datos de la API al formato esperado por el modal
+                // Transformar y ORDENAR datos de la API al formato esperado por el modal
+                // 🔄 ORDENAR exámenes por fecha (más próximos primero)
+                const examenesProcesados = apiResult.data.examenes.map((examen: any) => ({
+                    materia: examen.materia?.nombre || examen.materia?.nombreCorto || 'Materia no especificada',
+                    fecha: formatearFecha(examen.fecha || examen.fechaExterna),
+                    fechaRaw: examen.fecha || examen.fechaExterna, // Fecha cruda para ordenamiento
+                    hora: examen.hora || 'Hora no especificada',
+                    horaRaw: examen.hora || '00:00', // Hora cruda para ordenamiento
+                    aula: examen.aula?.nombre || 'Sin asignar',
+                    ubicacion: examen.aula?.ubicacion || '',
+                    tipo: examen.tipoExamen || 'No especificado',
+                    modalidad: examen.modalidad || 'presencial',
+                    profesor: examen.docente || 'No especificado',
+                    observaciones: examen.observaciones || '',
+                    materialPermitido: examen.materialPermitido || '',
+                    requierePc: examen.requierePc || false,
+                    carrera: examen.carrera?.nombre || 'No especificada',
+                    facultad: examen.carrera?.facultad || 'No especificada'
+                }));
+
+                // 📊 ORDENAMIENTO: Primero por fecha, luego por hora (más próximos primero)
+                examenesProcesados.sort((a: any, b: any) => {
+                    // Crear fechas para comparación
+                    const fechaA = new Date(a.fechaRaw + 'T' + a.horaRaw + ':00');
+                    const fechaB = new Date(b.fechaRaw + 'T' + b.horaRaw + ':00');
+                    
+                    // Si alguna fecha es inválida, ponerla al final
+                    if (isNaN(fechaA.getTime())) return 1;
+                    if (isNaN(fechaB.getTime())) return -1;
+                    
+                    // Ordenar cronológicamente (más próximo primero)
+                    return fechaA.getTime() - fechaB.getTime();
+                });
+
                 const examData = {
                     dni: apiResult.data.estudiante.dni,
                     estudiante: {
@@ -324,21 +357,7 @@ import ExamModal from '../../components/ExamModal.astro';
                         lugar: apiResult.data.estudiante.lugar,
                         sector: apiResult.data.estudiante.sector
                     },
-                    examenes: apiResult.data.examenes.map((examen: any) => ({
-                        materia: examen.materia?.nombre || examen.materia?.nombreCorto || 'Materia no especificada',
-                        fecha: formatearFecha(examen.fecha || examen.fechaExterna),
-                        hora: examen.hora || 'Hora no especificada',
-                        aula: examen.aula?.nombre || 'Sin asignar',
-                        ubicacion: examen.aula?.ubicacion || '',
-                        tipo: examen.tipoExamen || 'No especificado',
-                        modalidad: examen.modalidad || 'presencial',
-                        profesor: examen.docente || 'No especificado',
-                        observaciones: examen.observaciones || '',
-                        materialPermitido: examen.materialPermitido || '',
-                        requierePc: examen.requierePc || false,
-                        carrera: examen.carrera?.nombre || 'No especificada',
-                        facultad: examen.carrera?.facultad || 'No especificada'
-                    }))
+                    examenes: examenesProcesados // Usar los exámenes ya ordenados
                 };
                 
                 console.log('Exámenes procesados:', examData);
