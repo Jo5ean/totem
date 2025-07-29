@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://totem-api-production.up.railway.app';
+
 const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
@@ -17,6 +19,14 @@ const nextConfig: NextConfig = {
         },
       },
     },
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${API_URL}/api/:path*`,
+      },
+    ];
   },
 };
 

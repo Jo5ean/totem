@@ -1,4 +1,6 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://totem-api-production.up.railway.app/api/v1';
+// Use relative URL in the browser, which will be handled by Next.js rewrites
+const isBrowser = typeof window !== 'undefined';
+const API_BASE_URL = isBrowser ? '/api/v1' : (process.env.NEXT_PUBLIC_API_URL || 'https://totem-api-production.up.railway.app/api/v1');
 
 class ApiClient {
   private baseUrl: string;
@@ -149,6 +151,20 @@ export const totemApi = {
     
     return apiClient.get(`/examenes/por-fecha${params.toString() ? `?${params.toString()}` : ''}`);
   },
+
+  // 🆕 ENROLLMENT SYNC
+  // Daily enrollment synchronization
+  syncAllEnrollments: () => apiClient.post('/enrollments/sync'),
+  
+  // Sync single exam enrollment
+  syncExamEnrollment: (examId: number) => 
+    apiClient.post(`/enrollments/exams/${examId}/sync`),
+  
+  // Get enrollment sync status
+  getEnrollmentSyncStatus: () => apiClient.get('/enrollments/status'),
+  
+  // Get enrollment statistics for dashboard
+  getEnrollmentStatistics: () => apiClient.get('/enrollments/statistics'),
   
   getExamenInscripciones: (id: number, filtros?: { rendida?: boolean; fechaDesde?: string; fechaHasta?: string }) => {
     const params = new URLSearchParams();

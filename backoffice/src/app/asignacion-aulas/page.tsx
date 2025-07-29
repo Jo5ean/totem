@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { SyncButton } from '@/components/SyncButton';
+import { UsersIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 interface Examen {
   id: number;
@@ -93,6 +95,7 @@ export default function AsignacionAulasPage() {
       ]);
       
       if (dataSinAula.success) {
+        console.log('Datos recibidos de la API (sin aula):', dataSinAula);
         // Mapear exámenes sin aula
         const examenesSinAula: { [fecha: string]: Examen[] } = {};
         Object.entries(dataSinAula.data.examenesPorFecha).forEach(([fecha, examenes]) => {
@@ -107,8 +110,9 @@ export default function AsignacionAulasPage() {
             necesitaAsignacion: examen.necesitaAsignacion
           }));
         });
+        console.log('Aulas disponibles a establecer:', dataSinAula.data.aulasDisponibles);
         setExamenesPorFecha(examenesSinAula);
-        setAulasDisponibles(dataSinAula.data.aulasDisponibles);
+        setAulasDisponibles(dataSinAula.data.aulasDisponibles || []);
       }
       
       if (dataAsignados.success) {
@@ -740,20 +744,42 @@ export default function AsignacionAulasPage() {
                             </span>
                           )}
                           {/* Mostrar inscriptos con indicador visual mejorado y más claro */}
-                          {examen.inscriptos !== undefined ? (
-                            <span className={`text-sm font-medium px-2 py-1 rounded-md ${
-                              examen.inscriptos > 0 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-orange-100 text-orange-800'
-                            }`}>
-                              👥 {examen.inscriptos} inscriptos
-                              {examen.inscriptos === 0 && ' (confirmado: cero)'}
-                            </span>
-                          ) : (
-                            <span className="text-sm font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600 border border-dashed border-gray-300">
-                              👥 Sin consultar (presiona &quot;Ver Inscriptos&quot;)
-                            </span>
-                          )}
+                          <div className="flex items-center space-x-2">
+                            {examen.inscriptos !== undefined && examen.inscriptos !== null ? (
+                              <div className="flex items-center space-x-2">
+                                <span className={`text-sm font-medium px-2 py-1 rounded-md flex items-center gap-1 ${
+                                  examen.inscriptos > 0 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  <UsersIcon className="h-4 w-4" />
+                                  {examen.inscriptos} inscriptos
+                                  {examen.inscriptos === 0 && ' (confirmado: cero)'}
+                                </span>
+                                <SyncButton 
+                                  examId={examen.id} 
+                                  onSyncComplete={cargarExamenes}
+                                  size="sm"
+                                  showLabel={false}
+                                  className="border-gray-300"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm font-medium px-2 py-1 rounded-md bg-gray-100 text-gray-600 border border-dashed border-gray-300 flex items-center gap-1">
+                                  <ExclamationTriangleIcon className="h-4 w-4" />
+                                  Sin datos de inscripción
+                                </span>
+                                <SyncButton 
+                                  examId={examen.id} 
+                                  onSyncComplete={cargarExamenes}
+                                  size="sm"
+                                  showLabel={false}
+                                  variant="secondary"
+                                />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
