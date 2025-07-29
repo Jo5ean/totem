@@ -7,58 +7,84 @@ class ApiClient {
     this.baseUrl = API_BASE_URL;
   }
 
-  async get<T>(endpoint: string): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`);
-    
+  private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage = `API Error: ${response.status}`;
+      
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      
+      throw new Error(errorMessage);
     }
     
     return response.json();
+  }
+
+  async get<T>(endpoint: string): Promise<T> {
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+      
+      return this.handleResponse<T>(response);
+    } catch (error) {
+      console.error(`GET ${endpoint} failed:`, error);
+      throw error;
+    }
   }
 
   async post<T>(endpoint: string, data?: any): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: data ? JSON.stringify(data) : undefined,
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: data ? JSON.stringify(data) : undefined,
+      });
+      
+      return this.handleResponse<T>(response);
+    } catch (error) {
+      console.error(`POST ${endpoint} failed:`, error);
+      throw error;
     }
-    
-    return response.json();
   }
 
   async put<T>(endpoint: string, data?: any): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: data ? JSON.stringify(data) : undefined,
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: data ? JSON.stringify(data) : undefined,
+      });
+      
+      return this.handleResponse<T>(response);
+    } catch (error) {
+      console.error(`PUT ${endpoint} failed:`, error);
+      throw error;
     }
-    
-    return response.json();
   }
 
   async delete<T>(endpoint: string): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'DELETE',
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'DELETE',
+      });
+      
+      return this.handleResponse<T>(response);
+    } catch (error) {
+      console.error(`DELETE ${endpoint} failed:`, error);
+      throw error;
     }
-    
-    return response.json();
   }
 }
 
@@ -119,9 +145,9 @@ export const totemApi = {
     if (filtros?.fechaDesde) params.append('fechaDesde', filtros.fechaDesde);
     if (filtros?.fechaHasta) params.append('fechaHasta', filtros.fechaHasta);
     if (filtros?.soloSinAula) params.append('soloSinAula', 'true');
-    if (filtros?.soloProximos) params.append('soloProximos', 'true');
+    if (filtros?.soloConAula) params.append('soloConAula', 'true');
     
-    return apiClient.get(`/examenes${params.toString() ? `?${params.toString()}` : ''}`);
+    return apiClient.get(`/examenes/por-fecha${params.toString() ? `?${params.toString()}` : ''}`);
   },
   
   getExamenInscripciones: (id: number, filtros?: { rendida?: boolean; fechaDesde?: string; fechaHasta?: string }) => {
@@ -218,6 +244,32 @@ export interface ConfiguracionVisual {
   activa?: boolean;
 }
 
+// 🆕 TIPOS PARA INSCRIPCIONES
+
+export interface Inscripcion {
+  dni: string;
+  nombre: string;
+  apellido: string;
+  nombreCompleto: string;
+  materia: string;
+  carrera: string;
+  modalidad: string;
+}
+
+export interface InscripcionesResponse {
+  success: boolean;
+  inscriptos: Inscripcion[];
+  cantidadInscriptos: number;
+  estadoConsulta: string;
+  fechaConsulta: string;
+  sugerenciaAula?: {
+    id: number;
+    nombre: string;
+    capacidad: number;
+    razon: string;
+  };
+}
+
 // 🆕 NUEVOS TIPOS PARA AULAS Y EXÁMENES
 
 export interface Aula {
@@ -282,6 +334,7 @@ export interface FiltrosExamenes {
   fechaDesde?: string;
   fechaHasta?: string;
   soloSinAula?: boolean;
+  soloConAula?: boolean;
   soloProximos?: boolean;
 }
 

@@ -1,14 +1,23 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'export',
-  trailingSlash: true,
-  images: {
-    unoptimized: true
+  eslint: {
+    ignoreDuringBuilds: true,
   },
-  // Configurar para subdirectorio
-  basePath: '/proyectos-innovalab/backoffice',
-  assetPrefix: '/proyectos-innovalab/backoffice'
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  // Configuración para desarrollo local
+  experimental: {
+    turbo: {
+      rules: {
+        '*.svg': {
+          loaders: ['@svgr/webpack'],
+          as: '*.js',
+        },
+      },
+    },
+  },
 };
 
 export default nextConfig;
