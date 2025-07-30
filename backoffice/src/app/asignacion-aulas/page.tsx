@@ -17,7 +17,7 @@ interface Examen {
     id: number;
     nombre: string;
     capacidad: number;
-    ubicacion: string;
+    sede: string;
   } | null;
   codigoMateria: string | null;
   inscriptos?: number;
@@ -28,7 +28,8 @@ interface Aula {
   id: number;
   nombre: string;
   capacidad: number;
-  ubicacion: string;
+  sede: string;
+  activa?: boolean;
 }
 
 interface Estadisticas {
@@ -56,7 +57,7 @@ interface ExamenAPI {
     id: number;
     nombre: string;
     capacidad: number;
-    ubicacion: string;
+    sede: string;
   } | null;
   codigoMateria: string;
   cantidadInscriptos: number;
@@ -104,9 +105,12 @@ export default function AsignacionAulasPage() {
             nombre: examen.nombre,
             hora: examen.hora,
             carrera: examen.carrera,
-            aula: examen.aula,
+            aula: examen.aula ? {
+              ...examen.aula,
+              sede: (examen.aula as any).sede || (examen.aula as any).ubicacion || ''
+            } : null,
             codigoMateria: examen.codigoMateria,
-            inscriptos: examen.cantidadInscriptos, // Usar cantidadInscriptos del backend
+            inscriptos: examen.cantidadInscriptos, // ✅ PERSISTIR: Ya viene del backend
             necesitaAsignacion: examen.necesitaAsignacion
           }));
         });
@@ -124,9 +128,12 @@ export default function AsignacionAulasPage() {
             nombre: examen.nombre,
             hora: examen.hora,
             carrera: examen.carrera,
-            aula: examen.aula,
+            aula: examen.aula ? {
+              ...examen.aula,
+              sede: (examen.aula as any).sede || (examen.aula as any).ubicacion || ''
+            } : null,
             codigoMateria: examen.codigoMateria,
-            inscriptos: examen.cantidadInscriptos, // Usar cantidadInscriptos del backend
+            inscriptos: examen.cantidadInscriptos, // ✅ PERSISTIR: Ya viene del backend
             necesitaAsignacion: examen.necesitaAsignacion
           }));
         });
@@ -139,6 +146,35 @@ export default function AsignacionAulasPage() {
     }
   };
 
+  // Actualizar solo un examen específico después de sincronización
+  const actualizarExamenEspecifico = async (examId: number, nuevoCantidadInscriptos: number) => {
+    // Actualizar en examenesPorFecha
+    setExamenesPorFecha(prev => {
+      const newState = { ...prev };
+      Object.keys(newState).forEach(fecha => {
+        newState[fecha] = newState[fecha].map(examen => 
+          examen.id === examId 
+            ? { ...examen, inscriptos: nuevoCantidadInscriptos }
+            : examen
+        );
+      });
+      return newState;
+    });
+
+    // Actualizar en examenesAsignadosPorFecha
+    setExamenesAsignadosPorFecha(prev => {
+      const newState = { ...prev };
+      Object.keys(newState).forEach(fecha => {
+        newState[fecha] = newState[fecha].map(examen => 
+          examen.id === examId 
+            ? { ...examen, inscriptos: nuevoCantidadInscriptos }
+            : examen
+        );
+      });
+      return newState;
+    });
+  };
+
   // Obtener inscriptos de un examen
   const obtenerInscriptos = async (examen: Examen) => {
     try {
@@ -147,14 +183,18 @@ export default function AsignacionAulasPage() {
       const data = await response.json();
       
       if (data.success || data.data) {
+        const cantidadInscriptos = data.data.cantidadInscriptos || 0;
         setInscriptos(data.data.inscriptos || []);
         const examenConInscriptos = {
           ...examen,
-          inscriptos: data.data.cantidadInscriptos || 0
+          inscriptos: cantidadInscriptos
         };
         setExamenSeleccionado(examenConInscriptos);
         setAulaSeleccionada(examen.aula?.id || null); // Inicializar con aula actual si existe
         setMostrarModal(true);
+        
+        // 🔧 ARREGLO: También actualizar la lista principal de exámenes
+        actualizarExamenEspecifico(examen.id, cantidadInscriptos);
       } else {
         alert('Error obteniendo inscriptos: ' + (data.error || 'API externa no disponible'));
         // Aún mostrar el modal pero sin inscriptos
@@ -171,9 +211,9 @@ export default function AsignacionAulasPage() {
     }
   };
 
-  // Eliminar asignación de aula (NUEVA FUNCIÓN)
-  const eliminarAsignacion = async (examenId: number) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar la asignación de aula? El examen quedará como "Sin Asignar".')) {
+  // Eliminar asignación de aula
+  const eliminarAsignacion = async (examenId: number, sinConfirmacion = false) => {
+    if (!sinConfirmacion && !window.confirm('¿Estás seguro de que quieres eliminar la asignación de aula? El examen quedará como "Sin Asignar".')) {
       return;
     }
 
@@ -190,25 +230,43 @@ export default function AsignacionAulasPage() {
       const data = await response.json();
       
       if (data.success) {
-        // Examen eliminado exitosamente
-        alert(`✅ Asignación eliminada: ${data.data.eliminacion.alumnosLiberados} alumnos liberados de ${data.data.eliminacion.aulaAnterior.nombre}`);
+        console.log(`🗑️ Asignación eliminada: Examen ${examenId} → Sin aula`);
         
-        // Actualizar el estado local
-        if (examenSeleccionado) {
-          const examenActualizado = {
-            ...examenSeleccionado,
+        // Actualizar estados locales inmediatamente
+        setExamenesPorFecha(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach(fecha => {
+            updated[fecha] = updated[fecha].map(examen => 
+              examen.id === examenId 
+                ? { ...examen, aula: null, necesitaAsignacion: true }
+                : examen
+            );
+          });
+          return updated;
+        });
+        
+        setExamenesAsignadosPorFecha(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach(fecha => {
+            updated[fecha] = updated[fecha].map(examen => 
+              examen.id === examenId 
+                ? { ...examen, aula: null, necesitaAsignacion: true }
+                : examen
+            );
+          });
+          return updated;
+        });
+        
+        // Actualizar examen seleccionado si está abierto el modal
+        if (examenSeleccionado && examenSeleccionado.id === examenId) {
+          setExamenSeleccionado(prev => ({
+            ...prev!,
             aula: null,
             necesitaAsignacion: true
-          };
-          setExamenSeleccionado(examenActualizado);
+          }));
+          setAulaSeleccionada(null);
         }
         
-        // Recargar los datos
-        await cargarExamenes();
-        
-        // Cerrar el modal
-        setMostrarModal(false);
-        setAulaSeleccionada(null);
       } else {
         alert('❌ Error eliminando asignación: ' + (data.error || data.message));
       }
@@ -238,14 +296,19 @@ export default function AsignacionAulasPage() {
     };
   };
 
-  // Asignar aula a un examen (directo, sin confirmación)
+  // Asignar aula a un examen (directo desde selector en carta)
   const asignarAula = async (examenId: number, aulaId: number) => {
     try {
       setProcesando(true);
-      setAulaSeleccionada(aulaId);
       
-      // Asignación directa con todos los inscriptos
-      const observacionesExtra = `Asignación: ${inscriptos.length} inscriptos`;
+      // Encontrar el aula seleccionada para obtener info
+      const aulaSeleccionadaInfo = aulasDisponibles.find(a => a.id === aulaId);
+      if (!aulaSeleccionadaInfo) {
+        alert('❌ Aula no encontrada');
+        return;
+      }
+      
+      console.log(`🏛️ Asignando aula "${aulaSeleccionadaInfo.nombre}" al examen ${examenId}`);
       
       const response = await fetch(`https://totem-api-production.up.railway.app/api/v1/examenes/${examenId}/asignar-aula`, {
         method: 'POST',
@@ -254,52 +317,68 @@ export default function AsignacionAulasPage() {
         },
         body: JSON.stringify({
           aulaId: aulaId,
-          observaciones: observacionesExtra
+          observaciones: `Asignación desde selector de carta`
         })
       });
       
       const data = await response.json();
       
       if (data.success) {
-        const { aulaNueva } = data.data.asignacion;
+        // ✅ CORREGIR: Acceso correcto a la estructura de respuesta
+        const aulaNueva = data.data.asignacion?.aulaNueva || data.data.examen.aula;
+        const tipo = data.data.asignacion?.tipo || 'ASIGNACION';
         
-        // Actualizar el examen seleccionado con el aula asignada
-        if (examenSeleccionado) {
-          const examenActualizado = {
-            ...examenSeleccionado,
-            aula: {
-              id: aulaId,
-              nombre: aulaNueva.nombre,
-              capacidad: aulaNueva.capacidad,
-              ubicacion: aulaNueva.ubicacion || ''
-            }
-          };
-          setExamenSeleccionado(examenActualizado);
-          
-          // Actualizar también en la lista de exámenes por fecha
-          setExamenesPorFecha(prev => {
-            const updated = { ...prev };
-            if (updated[fechaSeleccionada]) {
-              updated[fechaSeleccionada] = updated[fechaSeleccionada].map(examen => 
-                examen.id === examenSeleccionado.id ? examenActualizado : examen
-              );
-            }
-            return updated;
+        console.log(`✅ ${tipo}: Examen ${examenId} → ${aulaNueva.nombre}`);
+        
+        // Actualizar estados locales inmediatamente
+        const aulaInfo = {
+          id: aulaNueva.id,
+          nombre: aulaNueva.nombre,
+          capacidad: aulaNueva.capacidad,
+          sede: (aulaNueva as any).sede || (aulaNueva as any).ubicacion || ''
+        };
+        
+        // Actualizar en ambas listas (sin aula y con aula)
+        setExamenesPorFecha(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach(fecha => {
+            updated[fecha] = updated[fecha].map(examen => 
+              examen.id === examenId 
+                ? { ...examen, aula: aulaInfo, necesitaAsignacion: false }
+                : examen
+            );
           });
+          return updated;
+        });
+        
+        setExamenesAsignadosPorFecha(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach(fecha => {
+            updated[fecha] = updated[fecha].map(examen => 
+              examen.id === examenId 
+                ? { ...examen, aula: aulaInfo, necesitaAsignacion: false }
+                : examen
+            );
+          });
+          return updated;
+        });
+        
+        // Actualizar examen seleccionado si está abierto el modal
+        if (examenSeleccionado && examenSeleccionado.id === examenId) {
+          setExamenSeleccionado(prev => ({
+            ...prev!,
+            aula: aulaInfo,
+            necesitaAsignacion: false
+          }));
+          setAulaSeleccionada(aulaId);
         }
         
-        // No mostrar alert, solo feedback visual
-        
-        // Recargar datos en background para mantener consistencia
-        cargarExamenes();
       } else {
         alert('❌ Error asignando aula: ' + data.error);
-        setAulaSeleccionada(null);
       }
     } catch (error) {
       console.error('Error asignando aula:', error);
       alert('❌ Error conectando con el servidor');
-      setAulaSeleccionada(null);
     } finally {
       setProcesando(false);
     }
@@ -630,7 +709,7 @@ export default function AsignacionAulasPage() {
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <div className="text-sm font-medium text-gray-700">{aula.nombre}</div>
-                        <div className="text-xs text-gray-500">{aula.ubicacion}</div>
+                        <div className="text-xs text-gray-500">{aula.sede}</div>
                       </div>
                       <div className="text-right ml-2">
                         {horaSeleccionada && statsAula ? (
@@ -758,7 +837,11 @@ export default function AsignacionAulasPage() {
                                 </span>
                                 <SyncButton 
                                   examId={examen.id} 
-                                  onSyncComplete={cargarExamenes}
+                                  onSyncComplete={(examId, newInscriptos) => {
+                                    if (examId && newInscriptos !== undefined) {
+                                      actualizarExamenEspecifico(examId, newInscriptos);
+                                    }
+                                  }}
                                   size="sm"
                                   showLabel={false}
                                   className="border-gray-300"
@@ -772,7 +855,11 @@ export default function AsignacionAulasPage() {
                                 </span>
                                 <SyncButton 
                                   examId={examen.id} 
-                                  onSyncComplete={cargarExamenes}
+                                  onSyncComplete={(examId, newInscriptos) => {
+                                    if (examId && newInscriptos !== undefined) {
+                                      actualizarExamenEspecifico(examId, newInscriptos);
+                                    }
+                                  }}
                                   size="sm"
                                   showLabel={false}
                                   variant="secondary"
@@ -786,12 +873,48 @@ export default function AsignacionAulasPage() {
                   </div>
 
                   <div className="flex items-center space-x-3">
+                    {/* Selector de aulas directo en la carta */}
+                    <div className="flex items-center space-x-2">
+                      <select
+                        value={examen.aula?.id || ''}
+                        onChange={(e) => {
+                          const aulaId = e.target.value;
+                          if (aulaId) {
+                            asignarAula(examen.id, parseInt(aulaId));
+                          } else {
+                            // Si selecciona "Sin asignar", eliminar aula sin confirmación
+                            eliminarAsignacion(examen.id, true);
+                          }
+                        }}
+                        disabled={procesando}
+                        className="text-sm border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:bg-gray-100"
+                      >
+                        <option value="" className="text-gray-700">
+                          {examen.aula ? '🚫 Sin asignar' : '🏛️ Seleccionar aula...'}
+                        </option>
+                        {aulasDisponibles
+                          .filter(aula => aula.activa !== false) // Solo aulas activas
+                          .map(aula => (
+                          <option key={aula.id} value={aula.id} className="text-gray-900">
+                            {aula.nombre} (Cap: {aula.capacidad})
+                          </option>
+                        ))}
+                      </select>
+                      
+                      {/* Indicador visual del estado del aula */}
+                      {examen.aula && (
+                        <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                          ✅ {examen.aula.nombre}
+                        </span>
+                      )}
+                    </div>
+
                     <button
                       onClick={() => obtenerInscriptos(examen)}
                       disabled={procesando}
                       className="inline-flex items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-50"
                     >
-                      {procesando ? '⏳ Consultando...' : vistaActual === 'sin-aula' ? '👥 Ver Inscriptos' : '🔄 Cambiar Aula'}
+                      {procesando ? '⏳ Consultando...' : '👥 Ver Detalle'}
                     </button>
                   </div>
                 </div>
@@ -937,7 +1060,7 @@ export default function AsignacionAulasPage() {
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="font-medium text-gray-900">{aula.nombre}</div>
-                              <div className="text-sm text-gray-600">{aula.ubicacion}</div>
+                              <div className="text-sm text-gray-600">{aula.sede}</div>
                               <div className="text-sm text-blue-600 mt-1">
                                 📍 Capacidad: {aula.capacidad} personas (puede extenderse)
                               </div>

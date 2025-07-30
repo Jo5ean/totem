@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 
 interface SyncButtonProps {
   examId?: number;
-  onSyncComplete?: () => void;
+  onSyncComplete?: (examId?: number, newInscriptos?: number) => void;
   variant?: 'primary' | 'secondary' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   showLabel?: boolean;
@@ -31,21 +31,32 @@ export function SyncButton({
       
       let result: any;
       if (examId) {
-        // Sync single exam
+        // Sync single exam - usar endpoint mejorado que consulta UCASAL
         result = await totemApi.syncExamEnrollment(examId);
-        toast.success(`Inscripciones actualizadas: ${(result as any).data?.enrollmentCount || 0} estudiantes`);
+        
+        if (result.success) {
+          const cantidadInscriptos = result.data?.enrollmentCount || result.data?.cantidadInscriptos || 0;
+          // Toast discreto y temporal
+          toast.success(`✅ ${cantidadInscriptos} inscriptos encontrados`);
+          
+          setLastSyncTime(new Date());
+          // Llamar callback con datos específicos del examen
+          onSyncComplete?.(examId, cantidadInscriptos);
+        } else {
+          toast.error(`❌ ${result.error || 'Error consultando inscripciones'}`);
+        }
       } else {
         // Sync all exams
         result = await totemApi.syncAllEnrollments();
         toast.success(`Sincronización completa: ${(result as any).data?.totalUpdated || 0} exámenes actualizados`);
+        setLastSyncTime(new Date());
+        onSyncComplete?.();
       }
-      
-      setLastSyncTime(new Date());
-      onSyncComplete?.();
       
     } catch (error) {
       console.error('Error during sync:', error);
-      toast.error(examId ? 'Error al sincronizar examen' : 'Error en sincronización general');
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error(examId ? `❌ Error al consultar: ${errorMessage}` : 'Error en sincronización general');
     } finally {
       setIsSyncing(false);
     }

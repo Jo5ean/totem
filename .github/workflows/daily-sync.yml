@@ -1,0 +1,24 @@
+name: Daily Enrollment Sync
+
+# Ejecutar automáticamente cada día a las 4 AM (Argentina)
+on:
+  schedule:
+    - cron: '0 7 * * *'  # 7 AM UTC = 4 AM Argentina (UTC-3)
+  
+  # Permitir ejecución manual desde GitHub
+  workflow_dispatch:
+
+jobs:
+  sync-enrollments:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Trigger Daily Enrollment Sync
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            ${{ secrets.RAILWAY_API_URL }}/api/v1/enrollments/sync
+        
+      - name: Log Sync Status
+        run: |
+          echo "✅ Daily enrollment sync triggered at $(date)"

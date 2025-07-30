@@ -156,7 +156,7 @@ export const totemApi = {
   // Daily enrollment synchronization
   syncAllEnrollments: () => apiClient.post('/enrollments/sync'),
   
-  // Sync single exam enrollment
+  // Sync single exam enrollment - Usar endpoint mejorado que consulta UCASAL
   syncExamEnrollment: (examId: number) => 
     apiClient.post(`/enrollments/exams/${examId}/sync`),
   
@@ -292,8 +292,8 @@ export interface Aula {
   id: number;
   nombre: string;
   capacidad: number;
-  ubicacion: string;
-  disponible: boolean;
+  sede: string;
+  activa: boolean;
   _count?: {
     examenes: number;
   };
@@ -302,8 +302,8 @@ export interface Aula {
 export interface CrearAulaData {
   nombre: string;
   capacidad: number;
-  ubicacion: string;
-  disponible: boolean;
+  sede: string;
+  activa: boolean;
 }
 
 export interface Examen {
@@ -328,7 +328,7 @@ export interface Examen {
     id: number;
     nombre: string;
     capacidad: number;
-    ubicacion: string;
+    sede: string;
   };
   totemData?: {
     data: {

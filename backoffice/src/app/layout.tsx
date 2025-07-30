@@ -32,7 +32,30 @@ export default function RootLayout({
         <Layout>
           {children}
         </Layout>
-        <Toaster />
+        <Toaster 
+          position="bottom-right"
+          toastOptions={{
+            duration: 2000,
+            style: {
+              fontSize: '14px',
+              padding: '8px 12px',
+              maxWidth: '400px'
+            },
+            success: {
+              style: {
+                background: '#10B981',
+                color: 'white',
+              },
+            },
+            error: {
+              style: {
+                background: '#EF4444', 
+                color: 'white',
+              },
+              duration: 3000,
+            }
+          }}
+        />
       </body>
     </html>
   );
