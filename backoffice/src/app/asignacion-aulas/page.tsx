@@ -60,7 +60,8 @@ interface ExamenAPI {
     sede: string;
   } | null;
   codigoMateria: string;
-  cantidadInscriptos: number;
+  inscriptos?: number; // Campo que devuelve la API (puede estar ausente)
+  cantidadInscriptos?: number; // Campo legacy (puede estar ausente)
   necesitaAsignacion: boolean;
 }
 
@@ -110,7 +111,7 @@ export default function AsignacionAulasPage() {
               sede: (examen.aula as any).sede || (examen.aula as any).ubicacion || ''
             } : null,
             codigoMateria: examen.codigoMateria,
-            inscriptos: examen.cantidadInscriptos, // ✅ PERSISTIR: Ya viene del backend
+            inscriptos: examen.inscriptos, // La API devuelve "inscriptos" directamente
             necesitaAsignacion: examen.necesitaAsignacion
           }));
         });
@@ -133,7 +134,7 @@ export default function AsignacionAulasPage() {
               sede: (examen.aula as any).sede || (examen.aula as any).ubicacion || ''
             } : null,
             codigoMateria: examen.codigoMateria,
-            inscriptos: examen.cantidadInscriptos, // ✅ PERSISTIR: Ya viene del backend
+            inscriptos: examen.inscriptos, // La API devuelve "inscriptos" directamente
             necesitaAsignacion: examen.necesitaAsignacion
           }));
         });
@@ -317,6 +318,7 @@ export default function AsignacionAulasPage() {
         },
         body: JSON.stringify({
           aulaId: aulaId,
+          forzar: true, // Permitir asignación aunque exceda la capacidad
           observaciones: `Asignación desde selector de carta`
         })
       });
@@ -324,11 +326,29 @@ export default function AsignacionAulasPage() {
       const data = await response.json();
       
       if (data.success) {
-        // ✅ CORREGIR: Acceso correcto a la estructura de respuesta
-        const aulaNueva = data.data.asignacion?.aulaNueva || data.data.examen.aula;
-        const tipo = data.data.asignacion?.tipo || 'ASIGNACION';
+        console.log('Respuesta completa de la API:', data);
+        
+        // ✅ CORREGIR: Manejo según la estructura real de la API
+        let aulaNueva;
+        let tipo = 'ASIGNACION';
+        
+        // La estructura real es: data.examen.aula
+        if (data.examen?.aula) {
+          aulaNueva = data.examen.aula;
+        } else if (data.aula) {
+          aulaNueva = data.aula;
+        } else {
+          console.error('No se pudo encontrar información del aula en la respuesta:', data);
+          alert('❌ Error: Respuesta inesperada de la API - no se encontró información del aula');
+          return;
+        }
         
         console.log(`✅ ${tipo}: Examen ${examenId} → ${aulaNueva.nombre}`);
+        
+        // Mostrar información adicional si está disponible
+        if (data.asignacion) {
+          console.log(`📊 Estadísticas: ${data.asignacion.inscriptos} inscriptos en aula de ${data.asignacion.capacidad} personas (${data.asignacion.porcentaje_ocupacion}% ocupación)`);
+        }
         
         // Actualizar estados locales inmediatamente
         const aulaInfo = {
@@ -374,7 +394,40 @@ export default function AsignacionAulasPage() {
         }
         
       } else {
-        alert('❌ Error asignando aula: ' + data.error);
+        console.error('Error en la asignación:', data);
+        
+        // Manejar errores específicos con más detalle
+        if (response.status === 400) {
+          try {
+            const errorData = data; // Ya parseado como JSON
+            if (errorData.error === 'Capacidad insuficiente') {
+              const confirmar = window.confirm(
+                `⚠️ CAPACIDAD INSUFICIENTE\n\n` +
+                `El aula "${aulaSeleccionadaInfo.nombre}" tiene capacidad para ${errorData.capacidad_aula || aulaSeleccionadaInfo.capacidad} personas,\n` +
+                `pero el examen tiene ${errorData.inscriptos_examen} inscriptos.\n\n` +
+                `¿Deseas asignar el aula de todas formas?\n` +
+                `(Puede ampliarse la capacidad según necesidades)`
+              );
+              
+              if (confirmar) {
+                // Reintentar con forzar=true
+                return asignarAula(examenId, aulaId);
+              }
+              return;
+            } else if (errorData.error === 'Conflicto de horario') {
+              alert(
+                `⚠️ CONFLICTO DE HORARIO\n\n` +
+                `${errorData.message}\n\n` +
+                `Exámenes en conflicto:\n` +
+                `${errorData.conflictos?.map((c: any) => `• ${c.materia} (${c.carrera}): ${c.inscriptos} inscriptos`).join('\n') || 'No disponible'}`
+              );
+              return;
+            }
+          } catch (parseError) {
+            console.error('Error parseando respuesta de error:', parseError);
+          }
+        }
+        alert('❌ Error asignando aula: ' + (data.error || data.message || 'Error desconocido'));
       }
     } catch (error) {
       console.error('Error asignando aula:', error);
@@ -414,26 +467,29 @@ export default function AsignacionAulasPage() {
     }
   }, [loading, vistaActual, examenesPorFecha, examenesAsignadosPorFecha, fechaSeleccionada]);
 
-  // Obtener estadísticas
+  // Obtener estadísticas del horario seleccionado
   const obtenerEstadisticas = (): Estadisticas => {
-    const examenesActualesDelDia = examenesActuales[fechaSeleccionada] || [];
+    // 🔧 CAMBIO: Enfocarse solo en el horario seleccionado
+    const examenesDelHorario = horaSeleccionada 
+      ? examenesFiltrados  // Solo los del horario actual
+      : examenesActuales[fechaSeleccionada] || []; // Si no hay horario, todos del día
     
     // Solo contar inscriptos de exámenes que han sido consultados (no undefined)
-    const totalInscriptos = examenesActualesDelDia.reduce((total, examen) => {
+    const totalInscriptos = examenesDelHorario.reduce((total, examen) => {
       return total + (examen.inscriptos !== undefined ? examen.inscriptos : 0);
     }, 0);
     
     return {
-      totalExamenes: examenesActualesDelDia.length,
+      totalExamenes: examenesDelHorario.length,
       totalInscriptos: totalInscriptos,
-      porFacultad: examenesActualesDelDia.reduce((acc: { [facultad: string]: number }, examen) => {
+      porFacultad: examenesDelHorario.reduce((acc: { [facultad: string]: number }, examen) => {
         const facultad = examen.carrera.facultad;
-        acc[facultad] = (acc[facultad] || 0) + 1;
+        acc[facultad] = (acc[facultad] || 0) + (examen.inscriptos || 0); // Sumar inscriptos, no cantidad de exámenes
         return acc;
       }, {}),
-      porHora: examenesActualesDelDia.reduce((acc: { [hora: string]: number }, examen) => {
+      porHora: examenesDelHorario.reduce((acc: { [hora: string]: number }, examen) => {
         const hora = examen.hora || 'Sin hora';
-        acc[hora] = (acc[hora] || 0) + 1;
+        acc[hora] = (acc[hora] || 0) + (examen.inscriptos || 0); // Sumar inscriptos por hora
         return acc;
       }, {})
     };
@@ -629,16 +685,21 @@ export default function AsignacionAulasPage() {
         </div>
       )}
 
-      {/* Estadísticas rápidas */}
+      {/* Estadísticas rápidas del horario seleccionado */}
       {fechaSeleccionada && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">📊 Total del día</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              📊 {horaSeleccionada ? `Horario ${horaSeleccionada}` : 'Total del día'}
+            </h3>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-bold text-blue-600">{estadisticas.totalExamenes}</p>
                 <p className="text-sm text-gray-500">
                   {vistaActual === 'sin-aula' ? 'exámenes sin aula' : 'exámenes con aula'}
+                  {horaSeleccionada && (
+                    <span className="block text-xs text-blue-600 font-medium">en este horario</span>
+                  )}
                 </p>
               </div>
               <div className="text-right">
@@ -650,48 +711,32 @@ export default function AsignacionAulasPage() {
                       +{examenesSinConsultar.length} sin consultar
                     </span>
                   )}
+                  {horaSeleccionada && (
+                    <span className="block text-xs text-green-600 font-medium">en este horario</span>
+                  )}
                 </p>
               </div>
             </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">🏫 Exámenes por Facultad</h3>
-            <div className="space-y-2">
-              {Object.entries(estadisticas.porFacultad).map(([facultad, cantidad]) => {
-                // Calcular inscriptos por facultad
-                const examenesDelDiaFacultad = (examenesActuales[fechaSeleccionada] || [])
-                  .filter(e => e.carrera.facultad === facultad);
-                const inscriptosFacultad = examenesDelDiaFacultad.reduce((total, examen) => {
-                  return total + (examen.inscriptos !== undefined ? examen.inscriptos : 0);
-                }, 0);
-                const sinConsultarFacultad = examenesDelDiaFacultad.filter(e => e.inscriptos === undefined).length;
-                
-                return (
-                  <div key={facultad} className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex justify-between items-start">
-                      <span className="text-sm font-medium text-gray-700 truncate flex-1">
-                        {facultad.replace('FACULTAD DE ', '').replace('CIENCIAS ', '')}
-                      </span>
-                      <div className="text-right ml-2">
-                        <div className="text-sm font-bold text-blue-600">{cantidad as number} exámenes</div>
-                        <div className="text-xs text-green-600">
-                          {inscriptosFacultad} inscriptos
-                          {sinConsultarFacultad > 0 && (
-                            <span className="text-orange-500"> +{sinConsultarFacultad}?</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            
+            {/* Indicador adicional de eficiencia */}
+            {horaSeleccionada && examenesFiltrados.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Consultas completadas:</span>
+                  <span className={`font-medium ${
+                    examenesSinConsultar.length === 0 ? 'text-green-600' : 'text-orange-600'
+                  }`}>
+                    {examenesFiltrados.length - examenesSinConsultar.length}/{examenesFiltrados.length}
+                    {examenesSinConsultar.length === 0 && ' ✅'}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              🏛️ Ocupación de Aulas
+              🏛️ Ocupación en Tiempo Real
               {horaSeleccionada && (
                 <span className="text-sm font-normal text-gray-500 ml-2">({horaSeleccionada})</span>
               )}
@@ -724,11 +769,15 @@ export default function AsignacionAulasPage() {
                             </div>
                             {statsAula.totalInscriptos > 0 && (
                               <div className={`text-xs ${
-                                porcentajeOcupacion > 80 ? 'text-red-600' 
+                                porcentajeOcupacion > 100 ? 'text-red-600 font-bold' 
+                                : porcentajeOcupacion > 80 ? 'text-red-600' 
                                 : porcentajeOcupacion > 50 ? 'text-orange-600' 
                                 : 'text-green-600'
                               }`}>
                                 {porcentajeOcupacion}% ({statsAula.cantidadExamenes} exam{statsAula.cantidadExamenes !== 1 ? 'es' : ''})
+                                {porcentajeOcupacion > 100 && (
+                                  <span className="block text-xs font-bold text-red-600">¡SOBRECAPACIDAD!</span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -824,7 +873,7 @@ export default function AsignacionAulasPage() {
                           )}
                           {/* Mostrar inscriptos con indicador visual mejorado y más claro */}
                           <div className="flex items-center space-x-2">
-                            {examen.inscriptos !== undefined && examen.inscriptos !== null ? (
+                            {examen.inscriptos !== undefined ? (
                               <div className="flex items-center space-x-2">
                                 <span className={`text-sm font-medium px-2 py-1 rounded-md flex items-center gap-1 ${
                                   examen.inscriptos > 0 
