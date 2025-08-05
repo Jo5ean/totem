@@ -7,11 +7,11 @@
         autoplay 
         muted 
         loop
-        poster="./images/fondo.jpg"
+        poster="/images/fondo.jpg"
     >
         <source src="./videos/video.webm" type="video/webm">
         <!-- Fallback a imagen si no hay video -->
-        <div class="absolute inset-0 bg-cover bg-center bg-no-repeat" style="background-image: url('./images/fondo.jpg')"></div>
+        <div class="absolute inset-0 bg-cover bg-center bg-no-repeat" style="background-image: url('/images/fondo.jpg')"></div>
     </video>
     
     <!-- Overlay sutil para el video -->
@@ -19,15 +19,27 @@
     
     <!-- Contenido del video -->
     <div class="relative z-10 h-full flex flex-col items-center justify-end px-6 pb-24">
-   
-        <!-- Botón Comenzar -->
-        <button 
-            id="startBtn"
-            class="group relative px-12 py-4 text-xl md:text-2xl bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full transition-all duration-500 hover:scale-110 shadow-2xl hover:shadow-red-500/25 animate-pulse-slow"
-        >
-            <span class="relative z-10">Comenzar</span>
-            <div class="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        </button>
+        
+        <!-- Contenedor de botones -->
+        <div class="flex flex-col md:flex-row gap-4 items-center">
+            <!-- Botón Comenzar -->
+            <button 
+                id="startBtn"
+                class="group relative px-12 py-4 text-xl md:text-2xl bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full transition-all duration-500 hover:scale-110 shadow-2xl hover:shadow-red-500/25 animate-pulse-slow"
+            >
+                <span class="relative z-10">Comenzar</span>
+                <div class="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            </button>
+            
+            <!-- Botón Ver Exámenes -->
+            <a 
+                href="https://wwwold.ucasal.edu.ar/proyectos-innovalab/web/genially/" 
+                class="group relative px-12 py-4 text-xl md:text-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-full transition-all duration-500 hover:scale-110 shadow-2xl hover:shadow-blue-500/25"
+            >
+                <span class="relative z-10">Ver Exámenes</span>
+                <div class="absolute inset-0 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            </a>
+        </div>
     </div>
 </div>
 

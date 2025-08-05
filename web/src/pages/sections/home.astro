@@ -6,7 +6,7 @@ import ExamModal from '../../components/ExamModal.astro';
     <!-- Imagen de fondo para la consulta -->
     <div
         class="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style="background-image: url('./images/fondo.jpg')"
+        style="background-image: url('/images/fondo.jpg')"
     ></div>
     
     <!-- Overlay con degradado horizontal y blur -->
@@ -28,7 +28,7 @@ import ExamModal from '../../components/ExamModal.astro';
         <!-- Logo centrado -->
         <div class="animate-fade-in">
             <img
-                src="./logos/ucasalx_logo.png"
+                src="https://wwwold.ucasal.edu.ar/proyectos-innovalab/web/logos/ucasalx_logo.png"
                 alt="UCASAL Logo"
                 class="h-24 md:h-40 lg:h-48"
             />
@@ -40,6 +40,7 @@ import ExamModal from '../../components/ExamModal.astro';
             <h1 class="text-white text-2xl md:text-3xl lg:text-5xl font-semibold text-center animate-slide-down">
                 Consulta donde rendis tu examen
             </h1>
+            
             
             <!-- Formulario -->
             <form id="examForm" class="w-full max-w-lg animate-slide-up" onsubmit="return false;">
@@ -286,6 +287,20 @@ import ExamModal from '../../components/ExamModal.astro';
             notFoundMessage?.classList.add('hidden');
         }
         
+        // Función auxiliar para obtener facultad por código de carrera
+        function obtenerFacultadPorCodigo(codigoCarrera: string): string {
+            const mapeoFacultades: { [key: string]: string } = {
+                '14': 'Economía y Administración',
+                '1': 'Artes y Ciencias',
+                '2': 'Ciencias Agrarias y Veterinaria',
+                '3': 'Ciencias de la Salud',
+                '4': 'Ingeniería',
+                '5': 'Derecho y Ciencias Políticas',
+                // Agregar más códigos según sea necesario
+            };
+            return mapeoFacultades[codigoCarrera] || 'Facultad no especificada';
+        }
+        
         // Validación del DNI
         function validateDNI(dni: string): boolean {
             const dniRegex = /^[0-9]{7,8}$/;
@@ -310,43 +325,83 @@ import ExamModal from '../../components/ExamModal.astro';
                 }
                 
                 const apiResult = await response.json();
+                console.log('Respuesta completa de API:', JSON.stringify(apiResult, null, 2));
                 
                 if (!apiResult.success || !apiResult.data.examenes || apiResult.data.examenes.length === 0) {
+                    console.log('No se encontraron exámenes en la respuesta de la API');
                     return { found: false };
                 }
                 
+                console.log('Datos de exámenes recibidos de API:', JSON.stringify(apiResult.data.examenes[0], null, 2));
+                
                 // Transformar y ORDENAR datos de la API al formato esperado por el modal
                 // 🔄 ORDENAR exámenes por fecha (más próximos primero)
-                const examenesProcesados = apiResult.data.examenes.map((examen: any) => ({
-                    materia: examen.materia?.nombre || examen.materia?.nombreCorto || 'Materia no especificada',
-                    fecha: formatearFecha(examen.fecha || examen.fechaExterna),
-                    fechaRaw: examen.fecha || examen.fechaExterna, // Fecha cruda para ordenamiento
-                    hora: examen.hora || 'Hora no especificada',
-                    horaRaw: examen.hora || '00:00', // Hora cruda para ordenamiento
-                    aula: examen.aula?.nombre || 'Sin asignar',
-                    ubicacion: examen.aula?.ubicacion || '',
-                    tipo: examen.tipoExamen || 'No especificado',
-                    modalidad: examen.modalidad || 'presencial',
-                    profesor: examen.docente || 'No especificado',
-                    observaciones: examen.observaciones || '',
-                    materialPermitido: examen.materialPermitido || '',
-                    requierePc: examen.requierePc || false,
-                    carrera: examen.carrera?.nombre || 'No especificada',
-                    facultad: examen.carrera?.facultad || 'No especificada'
-                }));
+                console.log('Procesando exámenes, cantidad:', apiResult.data.examenes.length);
+                
+                // Verificar estructura de datos de cada examen
+                apiResult.data.examenes.forEach((examen: any, index: number) => {
+                    console.log(`Examen ${index} - Estructura:`, {
+                        'materia': examen.materia,
+                        'fecha': examen.fecha || examen.fechaExterna,
+                        'hora': examen.hora,
+                        'aula': examen.aula,
+                        'carrera': examen.carrera,
+                        'facultad': examen.carrera?.facultad
+                    });
+                });
+                
+                const examenesProcesados = apiResult.data.examenes.map((examen: any) => {
+                    // Manejar la estructura real de la API
+                    const fechaExamen = examen.fecha || examen.fechaExterna;
+                    const horaExamen = examen.hora || null;
+                    const aulaExamen = examen.aula;
+                    const carreraExamen = examen.carrera;
+                    
+                    return {
+                        materia: examen.materia?.nombre || examen.materia?.nombreCorto || 'Materia no especificada',
+                        fecha: formatearFecha(fechaExamen),
+                        fechaRaw: fechaExamen, // Fecha cruda para ordenamiento
+                        hora: horaExamen || 'Hora no especificada',
+                        horaRaw: horaExamen || '00:00', // Hora cruda para ordenamiento
+                        aula: aulaExamen?.nombre || (aulaExamen ? aulaExamen : 'Sin asignar'),
+                        ubicacion: aulaExamen?.ubicacion || '',
+                        tipo: examen.tipoExamen || 'No especificado',
+                        modalidad: examen.modalidad || 'presencial',
+                        profesor: examen.docente || 'No especificado',
+                        observaciones: examen.observaciones || '',
+                        materialPermitido: examen.materialPermitido || '',
+                        requierePc: examen.requierePc || false,
+                        // Manejar carrera y facultad con datos limitados
+                        carrera: carreraExamen?.nombre || `Carrera ${carreraExamen?.codigo || 'No especificada'}`,
+                        facultad: carreraExamen?.facultad || obtenerFacultadPorCodigo(carreraExamen?.codigo) || 'Facultad no especificada'
+                    };
+                });
 
                 // 📊 ORDENAMIENTO: Primero por fecha, luego por hora (más próximos primero)
                 examenesProcesados.sort((a: any, b: any) => {
                     // Crear fechas para comparación
                     const fechaA = new Date(a.fechaRaw + 'T' + a.horaRaw + ':00');
                     const fechaB = new Date(b.fechaRaw + 'T' + b.horaRaw + ':00');
+                    const ahora = new Date();
                     
                     // Si alguna fecha es inválida, ponerla al final
                     if (isNaN(fechaA.getTime())) return 1;
                     if (isNaN(fechaB.getTime())) return -1;
                     
-                    // Ordenar cronológicamente (más próximo primero)
-                    return fechaA.getTime() - fechaB.getTime();
+                    // Calcular la diferencia entre cada fecha y la hora actual
+                    // Los exámenes pasados tendrán diferencia negativa
+                    // Los exámenes futuros tendrán diferencia positiva
+                    const diferenciaA = fechaA.getTime() - ahora.getTime();
+                    const diferenciaB = fechaB.getTime() - ahora.getTime();
+                    
+                    // Primero colocamos los exámenes futuros más cercanos
+                    // Si ambos son futuros o ambos son pasados, ordenar por cercanía a ahora
+                    if ((diferenciaA >= 0 && diferenciaB >= 0) || (diferenciaA < 0 && diferenciaB < 0)) {
+                        return Math.abs(diferenciaA) - Math.abs(diferenciaB);
+                    }
+                    
+                    // Si uno es futuro y otro pasado, priorizar el futuro
+                    return diferenciaB - diferenciaA;
                 });
 
                 const examData = {
@@ -360,7 +415,12 @@ import ExamModal from '../../components/ExamModal.astro';
                     examenes: examenesProcesados // Usar los exámenes ya ordenados
                 };
                 
-                console.log('Exámenes procesados:', examData);
+                console.log('Exámenes procesados (estructura final):', JSON.stringify(examData, null, 2));
+                console.log('Verificando campos críticos:');
+                console.log('- Facultad:', examData.examenes[0]?.facultad || 'No disponible');
+                console.log('- Hora:', examData.examenes[0]?.hora || 'No disponible');
+                console.log('- Fecha:', examData.examenes[0]?.fecha || 'No disponible');
+                console.log('- Materia:', examData.examenes[0]?.materia || 'No disponible');
                 
                 return {
                     found: true,

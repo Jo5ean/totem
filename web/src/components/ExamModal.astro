@@ -174,7 +174,7 @@ const examData = {
     let currentExamData: any = null;
     let modalAutoCloseTimer: number | null = null;
     let countdownTimer: number | null = null;
-    let countdownSeconds = 20;
+    let countdownSeconds = 300; // Aumentado de 20 a 300 segundos (5 minutos)
 
     // Funciones del modal
     function openExamModal() {
@@ -187,16 +187,16 @@ const examData = {
             // Bloquear scroll cuando el modal esté abierto
             document.body.style.overflow = 'hidden';
             
-            // 🕐 Configurar auto-close después de 20 segundos
-            modalAutoCloseTimer = window.setTimeout(() => {
-                console.log('⏰ Auto-cerrando modal después de 20 segundos');
-                closeModal();
-            }, 20000);
+            // 🕐 Auto-cierre desactivado para pruebas
+            // modalAutoCloseTimer = window.setTimeout(() => {
+            //     console.log('⏰ Auto-cerrando modal después de 20 segundos');
+            //     closeModal();
+            // }, 20000);
             
-            // 📊 Mostrar indicador de countdown
-            iniciarCountdown();
+            // 📊 Indicador de countdown desactivado
+            // iniciarCountdown();
             
-            console.log('⏰ Modal se cerrará automáticamente en 20 segundos');
+            console.log('⏰ Auto-cierre del modal desactivado para pruebas');
         } else {
             console.error('Modal element o datos no encontrados!');
         }
@@ -335,7 +335,10 @@ const examData = {
     
     // Poblar el modal con datos optimizado para UX
     function populateModal(data: any) {
-        console.log('Poblando modal con:', data);
+        console.log('Poblando modal con:', JSON.stringify(data, null, 2));
+        console.log('Estructura de datos.examenes:', data.examenes ? JSON.stringify(data.examenes[0], null, 2) : 'No hay exámenes');
+        console.log('Facultad:', data.examenes?.[0]?.carrera?.facultad || 'No disponible');
+        console.log('Hora:', data.examenes?.[0]?.hora || 'No disponible');
         
         // Actualizar información del estudiante en el header
         const studentName = document.getElementById('studentName');
@@ -347,10 +350,15 @@ const examData = {
         
         // Formatear carrera con facultad
         if (studentCareer) {
+            console.log('Carrera del estudiante:', data.estudiante?.carrera || 'No disponible');
+            console.log('Facultad del examen:', data.examenes?.[0]?.facultad || 'No disponible');
+            
+            // Usar la facultad del examen procesado, no de la estructura original
             const carreraFormateada = formatearCarreraFacultad(
                 data.estudiante?.carrera || '',
                 data.examenes?.[0]?.facultad || ''
             );
+            console.log('Carrera formateada:', carreraFormateada);
             studentCareer.textContent = carreraFormateada;
         }
         
@@ -413,7 +421,7 @@ const examData = {
                                 </svg>
                                 <span class="text-sm font-semibold text-red-700 uppercase tracking-wide">HORA</span>
                             </div>
-                            <p class="text-xl font-bold text-gray-800">${formatearHora(exam.hora)}</p>
+                            <p class="text-xl font-bold text-gray-800">${formatearHora(exam.hora || 'Hora no especificada')}</p>
                         </div>
                     </div>
                     

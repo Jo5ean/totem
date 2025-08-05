@@ -1,17 +1,16 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import Home from '../pages/sections/home.astro';
 ---
 
-<Layout title="UCASAL - Inicio">
+<Layout title="UCASAL - Genially">
     <div class="w-full h-screen flex flex-col bg-gray-900">
         <!-- Cabecera -->
-        <header class="bg-blue-900 text-white p-4 flex items-center justify-center shadow-lg relative">
-            <div class="absolute left-4">
+        <header class="bg-blue-900 text-white p-4 flex items-center justify-between shadow-lg">
+            <div class="flex items-center space-x-4">
                 <img src="https://wwwold.ucasal.edu.ar/proyectos-innovalab/web/logos/ucasalx_logo.png" alt="UCASAL Logo" class="h-10" />
             </div>
-            <a href="#appSection" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg transition-colors font-semibold shadow-md">
-                Consultar dónde rendís
+            <a href="https://wwwold.ucasal.edu.ar/proyectos-innovalab/web/" class="bg-blue-700 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                Volver al Inicio
             </a>
         </header>
 
@@ -31,9 +30,6 @@ import Home from '../pages/sections/home.astro';
             © 2025 Universidad Católica de Salta - Todos los derechos reservados
         </footer>
     </div>
-
-    <!-- Sección de consulta de exámenes -->
-    <Home />
 </Layout>
 
 <script>
@@ -64,17 +60,5 @@ import Home from '../pages/sections/home.astro';
         
         // También verificar después de un tiempo por si acaso
         setTimeout(checkIframeLoaded, 5000);
-
-        // Manejar el scroll suave al hacer clic en el botón de consulta
-        const consultaBtn = document.querySelector('a[href="#appSection"]');
-        if (consultaBtn) {
-            consultaBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const appSection = document.getElementById('appSection');
-                if (appSection) {
-                    appSection.scrollIntoView({ behavior: 'smooth' });
-                }
-            });
-        }
     });
 </script>

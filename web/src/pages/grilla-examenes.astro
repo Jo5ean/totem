@@ -1,0 +1,425 @@
+---
+import Layout from '../layouts/Layout.astro';
+export const prerender = true;
+---
+
+<Layout>
+    <!-- Contenedor principal con altura fija de pantalla -->
+    <div class="h-screen flex flex-col overflow-hidden relative">
+        <!-- Imagen de fondo -->
+        <div
+            class="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style="background-image: url('/images/fondo-grilla.jpg')"
+        ></div>
+        
+        <!-- Overlay oscuro -->
+        <div class="absolute inset-0 bg-black/30"></div>
+
+        <!-- Contenido principal (estructura flex para controlar altura) -->
+        <div class="relative z-10 flex flex-col h-full p-4">
+            <!-- Header (altura fija) -->
+            <div class="bg-white/95 backdrop-blur-sm rounded-lg p-3 border-2 border-yellow-400 mb-2">
+                <h1 class="text-2xl md:text-3xl font-bold text-black">GRILLA DE EXÁMENES</h1>
+                <p class="text-black font-semibold text-sm">Programación por Aulas y Turnos</p>
+            </div>
+
+            <!-- Pestañas de horarios (altura fija) -->
+            <div id="horarioTabs" class="bg-blue-900/80 backdrop-blur-sm rounded-lg p-2 mb-2 flex justify-center">
+                <div id="tabs-container" class="tabs flex space-x-2">
+                    <!-- Las pestañas se generarán dinámicamente con JavaScript -->
+                    <button class="tab-horario px-4 py-2 rounded-lg bg-blue-700 text-white font-bold" data-hora="14:00">14:00 HS</button>
+                </div>
+            </div>
+
+            <!-- Estado de carga -->
+            <div id="loadingState" class="text-center py-4">
+                <p class="text-white text-xl font-bold bg-black/70 p-3 rounded-lg">Cargando exámenes...</p>
+            </div>
+
+            <!-- Estadísticas (altura compacta) -->
+            <div id="estadisticasPanel" class="hidden mb-2 bg-white/95 backdrop-blur-sm rounded-lg p-2 shadow-sm border-2 border-cyan-400">
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                        <div id="totalExamenes" class="text-2xl font-bold text-black">0</div>
+                        <div class="text-black font-semibold text-xs">Total</div>
+                    </div>
+                    <div>
+                        <div id="examenesSinAula" class="text-2xl font-bold text-red-600">0</div>
+                        <div class="text-black font-semibold text-xs">Sin Aula</div>
+                    </div>
+                    <div>
+                        <div id="examenesConAula" class="text-2xl font-bold text-green-600">0</div>
+                        <div class="text-black font-semibold text-xs">Con Aula</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contenedor de la grilla con altura flexible (flex-1) -->
+            <div id="grillaExamenes" class="hidden flex-1 min-h-0 overflow-hidden"></div>
+
+            <!-- Error (solo visible cuando hay error) -->
+            <div id="errorState" class="hidden text-center py-4">
+                <div class="bg-red-500/90 p-4 rounded-lg border-2 border-red-700">
+                    <p class="text-white font-bold text-xl">Error al cargar datos</p>
+                    <p class="text-white font-semibold" id="errorMessage">No se pudieron cargar los exámenes</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Estilos específicos para la grilla de exámenes */
+        .animate-fade-in {
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+
+    <script>
+        // Script para la grilla de exámenes
+        let examenesData: any = {};
+        let horarioActivo: string = '14:00'; // Horario seleccionado por defecto
+        
+        // Detectar si estamos en producción o desarrollo
+        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const API_BASE = isDevelopment 
+            ? 'https://totem-api-production.up.railway.app/api/v1'
+            : 'https://totem-api-production.up.railway.app/api/v1';
+
+        console.log('🌐 Entorno:', isDevelopment ? 'Desarrollo' : 'Producción');
+        console.log('🔗 API Base:', API_BASE);
+        
+        // Función para inicializar las pestañas de horarios
+        function inicializarPestañasHorarios() {
+            const tabs = document.querySelectorAll('.tab-horario');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Actualizar estado visual de las pestañas
+                    tabs.forEach(t => {
+                        t.classList.remove('bg-blue-700');
+                        t.classList.add('bg-blue-800/50');
+                        t.classList.remove('text-white', 'font-bold');
+                        t.classList.add('text-white/70');
+                    });
+                    
+                    tab.classList.remove('bg-blue-800/50');
+                    tab.classList.add('bg-blue-700');
+                    tab.classList.remove('text-white/70');
+                    tab.classList.add('text-white', 'font-bold');
+                    
+                    // Actualizar horario activo y renderizar
+                    const hora = tab.getAttribute('data-hora') || '14:00';
+                    horarioActivo = hora;
+                    renderizarGrillaLimpia();
+                });
+            });
+            
+            // Activar la pestaña de 14:00 por defecto
+            const defaultTab = document.querySelector('.tab-horario[data-hora="14:00"]');
+            if (defaultTab) {
+                (defaultTab as HTMLElement).click();
+            }
+        }
+
+        async function cargarExamenes() {
+            const loadingEl = document.getElementById('loadingState');
+            const errorEl = document.getElementById('errorState');
+            const contentEl = document.getElementById('contentState');
+            
+            if (loadingEl) loadingEl.classList.remove('hidden');
+            if (errorEl) errorEl.classList.add('hidden');
+            if (contentEl) contentEl.classList.add('hidden');
+            
+            try {
+                const fecha = '2025/08/04'; // Fecha fija para pruebas
+                const url = `${API_BASE}/examenes/por-fecha?fecha=${fecha}`;
+                
+                console.log('🔗 Consultando API:', url);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    mode: 'cors',
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('💾 Datos recibidos:', data);
+                
+                examenesData = data;
+                
+                // Extraer horarios únicos disponibles
+                const horarios = new Set();
+                if (data.examenesPorFecha && data.examenesPorFecha['2025-08-04']) {
+                    const examenesDelDia = data.examenesPorFecha['2025-08-04'];
+                    
+                    examenesDelDia.forEach((examen: any) => {
+                        if (examen.hora) {
+                            // Normalizar formato de hora (quitar segundos si existen)
+                            let hora = examen.hora;
+                            if (hora.includes(':')) {
+                                hora = hora.split(':').slice(0, 2).join(':');
+                            }
+                            horarios.add(hora);
+                        }
+                    });
+                    
+                    if (examenesDelDia.length > 0) {
+                        console.log('🔍 PRIMER EXAMEN ESTRUCTURA:', JSON.stringify(examenesDelDia[0], null, 2));
+                        
+                        // Analizar horas disponibles
+                        const horasUnicas = [...new Set(examenesDelDia.map((e: any) => e.hora))].sort();
+                        console.log('🔍 HORAS DISPONIBLES:', horasUnicas);
+                    }
+                }
+                
+                // Si no hay horarios, agregar uno por defecto
+                if (horarios.size === 0) {
+                    horarios.add('14:00');
+                }
+                
+                // Ordenar horarios
+                const horariosArray = Array.from(horarios) as string[];
+                horariosArray.sort();
+                console.log('🕒 HORARIOS DISPONIBLES:', horariosArray);
+                
+                // Generar pestañas de horarios
+                const tabsContainer = document.getElementById('tabs-container');
+                if (tabsContainer) {
+                    tabsContainer.innerHTML = '';
+                    
+                    horariosArray.forEach((hora) => {
+                        const tab = document.createElement('button');
+                        tab.className = 'tab-horario bg-blue-800/50 text-white/70 px-4 py-2 rounded-t-lg transition-colors';
+                        tab.setAttribute('data-hora', hora);
+                        tab.textContent = `${hora} HS`;
+                        tabsContainer.appendChild(tab);
+                    });
+                }
+                
+                // Inicializar las pestañas
+                inicializarPestañasHorarios();
+                
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (contentEl) contentEl.classList.remove('hidden');
+                
+            } catch (error: any) {
+                console.error('❌ Error:', error);
+                const errorMessageEl = document.getElementById('errorMessage');
+                if (errorMessageEl) errorMessageEl.textContent = `Error: ${error.message}`;
+                if (loadingEl) loadingEl.classList.add('hidden');
+                if (errorEl) errorEl.classList.remove('hidden');
+            }
+        }
+
+        function renderizarGrillaLimpia() {
+            const examenes = examenesData.examenesPorFecha && examenesData.examenesPorFecha['2025-08-04'] ? examenesData.examenesPorFecha['2025-08-04'] : [];
+            
+            console.log('🎥 TODOS LOS EXÁMENES 04/08:', examenes.length);
+            
+            // FILTRAR EXÁMENES POR HORARIO ACTIVO
+            const examenesHorario = examenes.filter((e: any) => {
+                const hora = e.hora;
+                return hora === horarioActivo || hora === `${horarioActivo}:00`;
+            });
+            
+            console.log(`🎥 EXÁMENES FILTRADOS ${horarioActivo}:`, examenesHorario.length);
+            console.log(`🎥 EXÁMENES ${horarioActivo}:`, examenesHorario);
+            
+            // Usar los exámenes del horario activo para el procesamiento
+            const examenesAMostrar = examenesHorario;
+            
+            // Estadísticas
+            const totalExamenes = examenesAMostrar.length;
+            const examenesSinAula = examenesAMostrar.filter((e: any) => !e.aula).length;
+            const examenesConAula = examenesAMostrar.filter((e: any) => e.aula).length;
+
+            const totalEl = document.getElementById('totalExamenes');
+            const sinAulaEl = document.getElementById('examenesSinAula');
+            const conAulaEl = document.getElementById('examenesConAula');
+
+            if (totalEl) totalEl.textContent = totalExamenes.toString();
+            if (sinAulaEl) sinAulaEl.textContent = examenesSinAula.toString();
+            if (conAulaEl) conAulaEl.textContent = examenesConAula.toString();
+
+            // Separar exámenes con y sin aula asignada
+            const examenesConAulaAsignada: any[] = [];
+            const examenesSinAulaAsignada: any[] = [];
+            
+            examenesAMostrar.forEach((examen: any) => {
+                if (examen.aula && examen.aula.trim() !== '') {
+                    examenesConAulaAsignada.push(examen);
+                } else {
+                    examenesSinAulaAsignada.push(examen);
+                }
+            });
+            
+            // Extraer aulas únicas para organizar la visualización
+            const aulasUnicas = new Set();
+            examenesConAulaAsignada.forEach((examen: any) => {
+                if (examen.aula) {
+                    aulasUnicas.add(examen.aula);
+                }
+            });
+            
+            // Si no hay aulas, usar valores por defecto
+            let aulasArray = Array.from(aulasUnicas) as string[];
+            if (aulasArray.length === 0) {
+                aulasArray = ['Aula 4', 'Aula 8', 'Aula 12'];
+            }
+            
+            // Organizar exámenes por aula
+            const examenesPorAula: any = {};
+            aulasArray.forEach(aula => {
+                examenesPorAula[aula] = [];
+            });
+            
+            // Agregar una categoría especial para exámenes sin aula
+            if (examenesSinAulaAsignada.length > 0) {
+                examenesPorAula['Sin Aula Asignada'] = examenesSinAulaAsignada;
+                aulasArray.push('Sin Aula Asignada');
+            }
+            
+            // Asignar exámenes a sus aulas
+            examenesConAulaAsignada.forEach((examen: any) => {
+                const aulaExamen = examen.aula;
+                if (examenesPorAula[aulaExamen]) {
+                    examenesPorAula[aulaExamen].push(examen);
+                }
+            });
+            
+            // Organizar carreras y materias por aula
+            const carrerasPorAula: any = {};
+            const materiasPorAula: any = {};
+            
+            Object.keys(examenesPorAula).forEach(aula => {
+                const examenesAula = examenesPorAula[aula];
+                const carrerasSet = new Set();
+                const materiasSet = new Set();
+                
+                examenesAula.forEach((examen: any) => {
+                    // Extraer carrera
+                    if (examen.carrera && examen.carrera.nombre) {
+                        carrerasSet.add(examen.carrera.nombre);
+                    }
+                    
+                    // Extraer materia
+                    if (examen.nombreMateria || examen.nombre) {
+                        const nombreMateria = examen.nombreMateria || examen.nombre;
+                        materiasSet.add(nombreMateria);
+                    }
+                });
+                
+                carrerasPorAula[aula] = Array.from(carrerasSet).sort();
+                materiasPorAula[aula] = Array.from(materiasSet).sort();
+            });
+            
+            // GENERAR HTML CON DISEÑO ADAPTADO A LA ALTURA DE PANTALLA
+            let html = `
+                <div class="h-full flex flex-col">
+                    <!-- Título del horario -->
+                    <h2 class="text-xl font-bold text-center mb-2 text-white bg-blue-900/80 py-1 px-3 rounded-lg inline-block mx-auto">
+                        Lunes 04 de Agosto 2025 - ${horarioActivo} HS
+                    </h2>
+                    
+                    <!-- Contenedor principal de aulas (altura dinámica) -->
+                    <div class="flex-1 min-h-0 flex flex-col gap-1">
+            `;
+            
+            // Determinar la altura para cada aula
+            const alturaAula = aulasArray.length > 0 ? `${Math.floor(100 / aulasArray.length)}%` : 'auto';
+            
+            // Generar filas para cada aula
+            aulasArray.forEach((aula: string, index: number) => {
+                const carreras = carrerasPorAula[aula as keyof typeof carrerasPorAula] || [];
+                const materias = materiasPorAula[aula as keyof typeof materiasPorAula] || [];
+                
+                // Determinar si es la sección "Sin Aula Asignada"
+                const esSinAula = aula === 'Sin Aula Asignada';
+                const bgColor = esSinAula ? 'bg-red-800/90' : 'bg-gray-800/90';
+                
+                html += `
+                    <!-- Fila para ${aula} -->
+                    <div class="flex-1 min-h-0 flex flex-col" style="height: ${alturaAula};">
+                        <!-- Cabecera de aula -->
+                        <div class="${bgColor} text-white font-bold p-1 text-center rounded-t-lg">
+                            ${aula} ${esSinAula ? '⚠️' : ''}
+                        </div>
+                        
+                        <!-- Contenido de aula (2 columnas) -->
+                        <div class="flex-1 min-h-0 grid grid-cols-2 gap-1 ${esSinAula ? 'bg-red-900/30' : 'bg-black/40'} backdrop-blur-sm p-1 rounded-b-lg">
+                            <!-- Columna Carreras -->
+                            <div class="overflow-hidden flex flex-col">
+                                <div class="bg-yellow-500/90 text-black font-bold text-xs p-1 text-center rounded-t-md">
+                                    CARRERAS (${carreras.length})
+                                </div>
+                                <div class="flex-1 min-h-0 overflow-y-auto bg-yellow-200/80 p-1 rounded-b-md">
+                                    <div class="space-y-1 text-xs">
+                                        ${carreras.map((carrera: string) => `
+                                            <div class="bg-yellow-100 p-1 rounded border-l-2 border-yellow-500 truncate" title="${carrera}">
+                                                ${carrera}
+                                            </div>
+                                        `).join('')}
+                                        ${carreras.length === 0 ? '<div class="italic text-gray-500 text-center">Sin carreras asignadas</div>' : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Columna Materias -->
+                            <div class="overflow-hidden flex flex-col">
+                                <div class="bg-cyan-500/90 text-black font-bold text-xs p-1 text-center rounded-t-md">
+                                    MATERIAS (${materias.length})
+                                </div>
+                                <div class="flex-1 min-h-0 overflow-y-auto bg-cyan-200/80 p-1 rounded-b-md">
+                                    <div class="space-y-1 text-xs">
+                                        ${materias.map((materia: string) => `
+                                            <div class="${esSinAula ? 'bg-red-50 border-l-2 border-red-500' : 'bg-cyan-100 border-l-2 border-cyan-500'} p-1 rounded truncate" title="${materia}">
+                                                ${materia}
+                                            </div>
+                                        `).join('')}
+                                        ${materias.length === 0 ? '<div class="italic text-gray-500 text-center">Sin materias asignadas</div>' : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+
+            const grillaEl = document.getElementById('grillaExamenes');
+            const loadingEl = document.getElementById('loadingState');
+            const estadisticasEl = document.getElementById('estadisticasPanel');
+
+            if (grillaEl) grillaEl.innerHTML = html;
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (grillaEl) grillaEl.classList.remove('hidden');
+            if (estadisticasEl) estadisticasEl.classList.remove('hidden');
+        }
+
+        // Inicializar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarExamenes();
+        });
+    </script>
+</Layout>
